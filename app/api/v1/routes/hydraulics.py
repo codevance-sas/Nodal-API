@@ -11,7 +11,6 @@ logger = logging.getLogger(__name__)
 
 # Create router
 router = APIRouter(
-    prefix="/api/hydraulics",
     tags=["hydraulics"],
     responses={404: {"description": "Not found"}},
 )
