@@ -22,7 +22,7 @@ from app.services.pvt.oil_props import (
 from app.services.pvt.gas_props import calculate_z, calculate_bg, calculate_gas_density
 from app.services.pvt.ift import calculate_ift
 
-router = APIRouter()
+router = APIRouter(tags=["pvt"])
 logger = logging.getLogger(__name__)
 
 # Cache for previously calculated curves to improve performance
