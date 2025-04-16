@@ -706,7 +706,7 @@ def api_to_sg(api):
     return 141.5 / (api + 131.5)
 
 
-@router.post("/api/pvt/curve")
+@router.post("/curve")
 async def get_property_curves(data: PVTInput, background_tasks: BackgroundTasks) -> Dict[str, Any]:
     """
     FastAPI endpoint to calculate property curves for all correlations.
@@ -757,7 +757,7 @@ async def get_property_curves(data: PVTInput, background_tasks: BackgroundTasks)
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
-@router.post("/api/pvt/curve/recommended")
+@router.post("/curve/recommended")
 async def get_recommended_curves(data: PVTInput) -> Dict[str, Any]:
     """
     Get only the recommended correlation curves.
@@ -792,7 +792,7 @@ async def get_recommended_curves(data: PVTInput) -> Dict[str, Any]:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/api/pvt/curve/compare/{property_name}")
+@router.post("/curve/compare/{property_name}")
 async def compare_correlations(property_name: str, data: PVTInput) -> Dict[str, Any]:
     """
     Get comparison data for a specific property with all available correlations.
@@ -843,7 +843,7 @@ async def compare_correlations(property_name: str, data: PVTInput) -> Dict[str, 
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/api/pvt/curve/bubble-points")
+@router.post("/curve/bubble-points")
 async def get_bubble_points(data: PVTInput) -> Dict[str, Any]:
     """
     Calculate bubble point pressures for all correlations.
@@ -901,7 +901,7 @@ async def get_bubble_points(data: PVTInput) -> Dict[str, Any]:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/api/pvt/clear-cache")
+@router.post("/clear-cache")
 async def clear_curve_cache() -> Dict[str, Any]:
     """
     Clear the curve cache to force fresh calculations.
