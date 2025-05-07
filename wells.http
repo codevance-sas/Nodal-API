@@ -1,8 +1,8 @@
 GET http://localhost:8000/operators
 
 ###
-GET http://localhost:8000/wells/1
+GET http://localhost:8000/wells/16333541
 Content-Type: application/json
 
 ###
-GET http://localhost:8000/surveys/49534156
+GET http://localhost:8000/surveys/16333541
