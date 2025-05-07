@@ -1,12 +1,20 @@
-from fastapi import FastAPI, Depends, Request
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from app.api.v1.routes import hydraulics, pvt
-from app.db.session import session
-from app.models.survey import Operator, Well
-from sqlmodel import select
-from sqlalchemy.orm import Session
 import time
-
+from app.api.v1.routes import operators
+from app.api.v1.routes import wells
+from app.api.v1.routes import surveys
 app = FastAPI(root_path="/api")
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allows all origins
+    allow_credentials=True,
+    allow_methods=["*"],  # Allows all methods
+    allow_headers=["*"],  # Allows all headers
+)
 
 @app.middleware("http")
 async def add_process_time_header(request: Request, call_next):
@@ -18,17 +26,9 @@ async def add_process_time_header(request: Request, call_next):
 
 app.include_router(hydraulics.router, prefix="/hydraulics")
 app.include_router(pvt.router, prefix="/pvt")
-
+app.include_router(operators.router, prefix="/operators")
+app.include_router(wells.router, prefix="/wells")
+app.include_router(surveys.router, prefix="/surveys")
 @app.get("/")
 async def root():
     return {"message": "Hello World"}
-
-@app.get("/operators")
-async def operators(session: Session = Depends(session)):
-    result = session.exec(select(Operator)).all()
-    return {"message": result}
-
-@app.get("/wells")
-async def wells(session: Session = Depends(session)):
-    result = session.exec(select(Well)).all()
-    return {"message": result}
