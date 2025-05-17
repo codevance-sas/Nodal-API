@@ -5,6 +5,8 @@ import time
 from app.api.v1.routes import operators
 from app.api.v1.routes import wells
 from app.api.v1.routes import surveys
+from app.api.v1.routes import ipr
+
 app = FastAPI(root_path="/api")
 
 # Add CORS middleware
