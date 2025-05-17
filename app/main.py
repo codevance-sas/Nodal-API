@@ -29,6 +29,9 @@ app.include_router(pvt.router, prefix="/pvt")
 app.include_router(operators.router, prefix="/operators")
 app.include_router(wells.router, prefix="/wells")
 app.include_router(surveys.router, prefix="/surveys")
+app.include_router(ipr.router, prefix="/ipr")
+
+
 @app.get("/")
 async def root():
     return {"message": "Hello World"}

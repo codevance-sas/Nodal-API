@@ -3,7 +3,7 @@ from app.db.session import session
 from app.models.survey import Survey
 from app.crud.surveys import get_survey as get_survey_crud
 from sqlmodel import Session
-router = APIRouter()
+router = APIRouter(tags=["directional_surveys"])
 
 @router.get("/{well_id}")
 async def get_survey(well_id: str, db: Session = Depends(session)):
