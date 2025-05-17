@@ -1,11 +1,15 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from app.api.v1.routes import hydraulics, pvt
+from app.api.v1.routes import (
+    hydraulics,
+    pvt,
+    operators,
+    wells,
+    surveys,
+    ipr,
+    pipeline
+)
 import time
-from app.api.v1.routes import operators
-from app.api.v1.routes import wells
-from app.api.v1.routes import surveys
-from app.api.v1.routes import ipr
 
 app = FastAPI(root_path="/api")
 
@@ -32,7 +36,7 @@ app.include_router(operators.router, prefix="/operators")
 app.include_router(wells.router, prefix="/wells")
 app.include_router(surveys.router, prefix="/surveys")
 app.include_router(ipr.router, prefix="/ipr")
-
+app.include_router(pipeline.router, prefix="/pipeline")
 
 @app.get("/")
 async def root():
