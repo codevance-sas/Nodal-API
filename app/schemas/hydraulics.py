@@ -28,14 +28,18 @@ class FluidPropertiesInput(BaseModel):
     gor: Optional[float] = Field(None, description="Gas-oil ratio, scf/STB")
     glr: Optional[float] = Field(None, description="Gas-liquid ratio, scf/STB")
 
-
+class PipeSegment(BaseModel):
+    start_depth: float = Field(..., description="Start depth of the segment, ft")
+    end_depth: float = Field(..., description="End depth of the segment, ft")
+    diameter: float = Field(..., description="Diameter of the segment, in")
+    
 class WellboreGeometryInput(BaseModel):
-    depth: float = Field(..., description="Well depth, ft")
+    pipe_segments: List[PipeSegment] = Field(..., description="List of pipe segments")
     deviation: float = Field(0.0, description="Well deviation from vertical, degrees")
-    tubing_id: float = Field(..., description="Tubing inner diameter, in")
-    casing_id: Optional[float] = Field(None, description="Casing inner diameter, in")
     roughness: float = Field(0.0006, description="Pipe roughness, in")
     depth_steps: int = Field(100, description="Number of calculation steps")
+
+
 
 
 class HydraulicsInput(BaseModel):

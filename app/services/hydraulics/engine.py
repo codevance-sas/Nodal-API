@@ -355,9 +355,19 @@ def get_example_input() -> HydraulicsInput:
             "surface_temperature": 75.0
         },
         wellbore_geometry={
-            "depth": 10000.0,
+            "pipe_segments": [
+                {
+                    "start_depth": 0.0,
+                    "end_depth": 10000.0,
+                    "diameter": 2.441
+                },
+                {
+                    "start_depth": 10000.0,
+                    "end_depth": 20000.0,
+                    "diameter": 2
+                }
+            ],
             "deviation": 0.0,
-            "tubing_id": 2.441,
             "roughness": 0.0006,
             "depth_steps": 100
         },
