@@ -13,6 +13,8 @@ class CorrelationBase(ABC):
         self.data = data    
         self.fluid = data.fluid_properties
         self.wellbore = data.wellbore_geometry
+        # Sort pipe segments by start_depth to ensure correct processing order
+        self.wellbore.pipe_segments.sort(key=lambda s: s.start_depth)
         self.surface_pressure = data.surface_pressure
 
         self.depth_steps = self.wellbore.depth_steps
