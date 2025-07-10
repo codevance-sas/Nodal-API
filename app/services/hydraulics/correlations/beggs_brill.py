@@ -28,45 +28,68 @@ def calculate_beggs_brill(data: HydraulicsInput) -> HydraulicsResult:
     fluid = data.fluid_properties
     wellbore = data.wellbore_geometry
     surface_pressure = data.surface_pressure
+    survey_data = data.survey_data
 
-    # Set up depth points for calculation
-    depth_steps = wellbore.depth_steps
-    depth_points = np.linspace(0, wellbore.depth, depth_steps)
+    # Determine total depth and segment information
+    if survey_data and len(survey_data) > 1:
+        # Sort survey data by measured depth to ensure correct order
+        survey_points = sorted(survey_data, key=lambda p: p.md)
+        total_depth = survey_points[-1].md
+        segments = []
+        for i in range(len(survey_points) - 1):
+            start_point = survey_points[i]
+            end_point = survey_points[i+1]
+            segment_length = end_point.md - start_point.md
+            # Use the inclination of the start of the segment for the entire segment
+            inclination_rad = math.radians(start_point.inclination)
+            segments.append((start_point.md, end_point.md, segment_length, inclination_rad))
+    else:
+        # Fallback to old method if no survey data is available
+        total_depth = wellbore.pipe_segments[-1].end_depth
+        segment_length = total_depth / wellbore.depth_steps
+        inclination_rad = math.radians(wellbore.deviation)
+        segments = [(i * segment_length, (i + 1) * segment_length, segment_length, inclination_rad) for i in range(wellbore.depth_steps)]
+    # Initialize results list and initial conditions
+    pressure_profile = []
+    current_p = surface_pressure
+    current_md = 0.0
 
-    # Initialize result arrays
-    pressures = np.zeros(depth_steps)
-    temperatures = np.zeros(depth_steps)
-    holdups = np.zeros(depth_steps)
-    flow_patterns = [None] * depth_steps
-    mixture_densities = np.zeros(depth_steps)
-    mixture_velocities = np.zeros(depth_steps)
-    friction_factors = np.zeros(depth_steps)
-    reynolds_numbers = np.zeros(depth_steps)
-    dpdz_elevation = np.zeros(depth_steps)
-    dpdz_friction = np.zeros(depth_steps)
-    dpdz_acceleration = np.zeros(depth_steps)
-    dpdz_total = np.zeros(depth_steps)
+    # Add surface point to the profile
+    surface_t = fluid.surface_temperature
+    pressure_profile.append(PressurePoint(
+        depth=current_md,
+        pressure=current_p,
+        temperature=surface_t
+    ))
 
-    # Initial conditions at surface
-    pressures[0] = surface_pressure
-    temperatures[0] = fluid.surface_temperature
-
-    # Compute temperature profile (linear gradient assumption)
-    for i in range(depth_steps):
-        temperatures[i] = fluid.surface_temperature + fluid.temperature_gradient * depth_points[i]
-
-    # Unit conversion constants and geometry
+    # Unit conversion constants
     g_c = 32.17    # ft·lbm/(lbf·s^2), unit conversion factor
     g = 32.2       # ft/s^2, gravitational acceleration
-    tubing_diameter = wellbore.tubing_id / 12.0  # convert tubing ID from inches to ft
-    tubing_area = math.pi * (tubing_diameter / 2.0) ** 2
-    roughness_rel = wellbore.roughness / (wellbore.tubing_id * 12.0)  # relative roughness (ft/ft)
 
-    # Stepwise calculation down the wellbore
-    for i in range(depth_steps - 1):
-        # Current state at depth step i
-        p = pressures[i]
-        T = temperatures[i]
+    # Stepwise calculation down the wellbore for each segment
+    for start_md, end_md, segment_length, inclination_rad in segments:
+        # Find the correct pipe segment for the current depth
+        current_pipe_segment = None
+        for pipe_seg in wellbore.pipe_segments:
+            # Check if the start of the calculation segment falls within this pipe segment
+            if pipe_seg.start_depth <= start_md < pipe_seg.end_depth:
+                current_pipe_segment = pipe_seg
+                break
+        
+        if not current_pipe_segment:
+            # If no specific segment is found (e.g., for the very last point at total_depth),
+            # use the last available pipe segment.
+            current_pipe_segment = wellbore.pipe_segments[-1]
+
+        # Calculate geometry for the current segment
+        tubing_id_in = current_pipe_segment.diameter
+        tubing_diameter = tubing_id_in / 12.0  # convert tubing ID from inches to ft
+        tubing_area = math.pi * (tubing_diameter / 2.0) ** 2
+        roughness_rel = wellbore.roughness / tubing_id_in  # relative roughness (unitless)
+
+        # Properties are calculated at the start of the segment
+        p = current_p
+        T = fluid.surface_temperature + fluid.temperature_gradient * start_md
 
         # Calculate fluid PVT properties at current pressure/temperature
         props = calculate_fluid_properties(
@@ -125,25 +148,10 @@ def calculate_beggs_brill(data: HydraulicsInput) -> HydraulicsResult:
 
         # --- Beggs & Brill Correlation Calculations ---
 
-        # Convert wellbore deviation (from vertical) to Beggs & Brill angle (from horizontal)
-        # Wellbore deviation: 0° = vertical, 90° = horizontal
-        # Beggs & Brill: 0° = horizontal, +90° = vertical up, -90° = vertical down
-        wellbore_deviation = wellbore.deviation  # Angle from vertical in degrees
-        beggs_brill_angle = 90.0 - wellbore_deviation  # Convert to angle from horizontal
-
-        # Determine if flow is upward or downward
-        # For a production well, flow is typically upward (toward surface)
-        # For an injection well, flow would be downward
-        is_upward = True  # Default assumption for production wells
-
-        # Set the correct sign for Beggs & Brill angle
-        if is_upward:
-            theta = beggs_brill_angle  # Positive for upward flow (standard case for production)
-        else:
-            theta = -beggs_brill_angle  # Negative for downward flow (injection wells)
-
-        # Convert to radians for trigonometric functions
-        theta_rad = math.radians(theta)
+        # The `inclination_rad` from the segment is the angle from the vertical.
+        # Beggs & Brill angle `theta` is from the horizontal.
+        # For upward flow, theta = 90 - inclination.
+        theta_rad = (math.pi / 2.0) - inclination_rad
 
         # 1. Dimensionless numbers for flow regime determination
         N_Fr = v_m**2 / (g * tubing_diameter)  # mixture Froude number
@@ -156,22 +164,23 @@ def calculate_beggs_brill(data: HydraulicsInput) -> HydraulicsResult:
         L4 = 0.50 * (C_L ** -6.738)
 
         # 3. Determine flow regime for horizontal flow (θ=0) based on C_L and N_Fr
+        current_flow_pattern: FlowPatternEnum
         if ((C_L < 0.01) and (N_Fr < L1)) or ((C_L >= 0.01) and (N_Fr < L2)):
             flow_regime = "Segregated"
-            flow_patterns[i] = FlowPatternEnum.STRATIFIED
+            current_flow_pattern = FlowPatternEnum.STRATIFIED
         elif ((0.01 <= C_L < 0.4) and (L3 < N_Fr <= L1)) or ((C_L >= 0.4) and (L3 < N_Fr <= L4)):
             flow_regime = "Intermittent"
-            flow_patterns[i] = FlowPatternEnum.SLUG
+            current_flow_pattern = FlowPatternEnum.SLUG
         elif (N_Fr > L4) or ((C_L < 0.4) and (N_Fr >= L4) and (L3 < N_Fr)):  # covers very high velocity cases
             flow_regime = "Distributed"
-            flow_patterns[i] = FlowPatternEnum.BUBBLE
+            current_flow_pattern = FlowPatternEnum.BUBBLE
         elif (L2 < N_Fr < L3):
             flow_regime = "Transition"
-            flow_patterns[i] = FlowPatternEnum.TRANSITION
+            current_flow_pattern = FlowPatternEnum.TRANSITION
         else:
             # Default to Distributed if none of the above (this also covers rare edge cases)
             flow_regime = "Distributed"
-            flow_patterns[i] = FlowPatternEnum.BUBBLE
+            current_flow_pattern = FlowPatternEnum.BUBBLE
 
         # 4. Liquid holdup for horizontal flow (H_L0 at θ=0)
         # Correlation parameters for H_L0 = a * C_L^b / N_Fr^c (from Beggs & Brill)
@@ -285,72 +294,61 @@ def calculate_beggs_brill(data: HydraulicsInput) -> HydraulicsResult:
         dpdz_acceleration[i] = dp_dz_acc
         dpdz_total[i] = dp_dz_total
 
-        # Update pressure to next depth point using the total pressure gradient
-        dz = depth_points[i+1] - depth_points[i]
-        pressures[i+1] = pressures[i] + dp_dz_total * dz
+        # Update pressure for the current segment
+        current_p += dp_dz_total * segment_length
+        current_md = end_md
 
-    # Fill in the last point's stored values (at bottomhole, index depth_steps-1)
-    holdups[-1] = holdups[-2]
-    flow_patterns[-1] = flow_patterns[-2] or FlowPatternEnum.BUBBLE
-    mixture_densities[-1] = mixture_densities[-2]
-    mixture_velocities[-1] = mixture_velocities[-2]
-    friction_factors[-1] = friction_factors[-2]
-    reynolds_numbers[-1] = reynolds_numbers[-2]
-    dpdz_elevation[-1] = dpdz_elevation[-2]
-    dpdz_friction[-1] = dpdz_friction[-2]
-    dpdz_acceleration[-1] = 0.0
-    dpdz_total[-1] = dpdz_elevation[-1] + dpdz_friction[-1]
-
-    # Build the PressurePoint list for the pressure profile
-    pressure_profile = []
-    for i in range(depth_steps):
+        # Store results for the end of the segment
         pressure_profile.append(PressurePoint(
-            depth=depth_points[i],
-            pressure=pressures[i],
-            temperature=temperatures[i],
-            flow_pattern=flow_patterns[i],
-            liquid_holdup=holdups[i],
-            mixture_density=mixture_densities[i],
-            mixture_velocity=mixture_velocities[i],
-            reynolds_number=reynolds_numbers[i],
-            friction_factor=friction_factors[i],
-            dpdz_elevation=dpdz_elevation[i],
-            dpdz_friction=dpdz_friction[i],
-            dpdz_acceleration=dpdz_acceleration[i],
-            dpdz_total=dpdz_total[i]
+            depth=current_md,
+            pressure=current_p,
+            temperature=fluid.surface_temperature + fluid.temperature_gradient * current_md,
+            flow_pattern=current_flow_pattern,
+            liquid_holdup=H_L,
+            mixture_density=rho_s,
+            mixture_velocity=v_m,
+            reynolds_number=Re_ns,
+            friction_factor=f_tp,
+            dpdz_elevation=dp_dz_elev,
+            dpdz_friction=dp_dz_fric,
+            dpdz_acceleration=dp_dz_acc,
+            dpdz_total=dp_dz_total
         ))
 
-    # Compute overall pressure drop components by integrating gradients over the wellbore
-    total_elev = np.trapz(dpdz_elevation, depth_points)  if depth_steps > 1 else dpdz_elevation[0] * wellbore.depth
-    total_fric = np.trapz(dpdz_friction, depth_points)   if depth_steps > 1 else dpdz_friction[0] * wellbore.depth
-    total_acc = 0.0  # no acceleration component in pure correlation
-    total_drop = total_elev + total_fric + total_acc
+    # Final calculations based on the generated profile
+    bhp = pressure_profile[-1].pressure
+    total_drop = bhp - surface_pressure
 
-    # Percentage contributions (avoid division by zero)
-    elev_pct = (total_elev / total_drop * 100.0) if total_drop != 0 else 0.0
-    fric_pct = (total_fric / total_drop * 100.0) if total_drop != 0 else 0.0
-    acc_pct  = 0.0
+    # Compute overall pressure drop components by summing segment contributions
+    total_elev_drop = sum(p.dpdz_elevation * (p.depth - pressure_profile[i].depth) for i, p in enumerate(pressure_profile[1:]))
+    total_fric_drop = sum(p.dpdz_friction * (p.depth - pressure_profile[i].depth) for i, p in enumerate(pressure_profile[1:]))
 
-    # (Optional) Prepare sampled flow pattern results (e.g., every 10th point for visualization)
+    # Percentage contributions
+    elev_pct = (total_elev_drop / total_drop * 100.0) if total_drop != 0 else 0.0
+    fric_pct = (total_fric_drop / total_drop * 100.0) if total_drop != 0 else 0.0
+    acc_pct = 0.0
+
+    # Sample flow patterns from the profile for the results
     flow_pattern_results = []
-    sample_interval = max(1, depth_steps // 20)
-    for j in range(0, depth_steps, sample_interval):
-        flow_pattern_results.append(FlowPatternResult(
-            depth=depth_points[j],
-            flow_pattern=flow_patterns[j] or FlowPatternEnum.BUBBLE,
-            liquid_holdup=holdups[j],
-            mixture_velocity=mixture_velocities[j],
-            superficial_liquid_velocity=v_sl,
-            superficial_gas_velocity=v_sg
-        ))
+    if len(pressure_profile) > 1:
+        sample_interval = max(1, len(pressure_profile) // 20)
+        for point in pressure_profile[::sample_interval]:
+            # Need to get v_sl and v_sg for this point, for now using last calculated values
+            flow_pattern_results.append(FlowPatternResult(
+                depth=point.depth,
+                flow_pattern=point.flow_pattern or FlowPatternEnum.BUBBLE,
+                liquid_holdup=point.liquid_holdup,
+                mixture_velocity=point.mixture_velocity,
+                superficial_liquid_velocity=v_sl, # Note: This is the value from the last segment
+                superficial_gas_velocity=v_sg  # Note: This is the value from the last segment
+            ))
 
-    # Return the results in a HydraulicsResult object
     return HydraulicsResult(
         method="Beggs-Brill (Pure)",
         pressure_profile=pressure_profile,
         surface_pressure=surface_pressure,
-        bottomhole_pressure=pressures[-1],
-        overall_pressure_drop=pressures[-1] - surface_pressure,
+        bottomhole_pressure=bhp,
+        overall_pressure_drop=total_drop,
         elevation_drop_percentage=elev_pct,
         friction_drop_percentage=fric_pct,
         acceleration_drop_percentage=acc_pct,

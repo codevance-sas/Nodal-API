@@ -1,7 +1,8 @@
 # app/api/v1/routes/hydraulics.py
 import numpy as np
 import copy
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
+from pydantic import ValidationError
 from typing import List, Dict, Any, Optional
 import logging
 
@@ -26,13 +27,19 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["hydraulics"])
 
 
-@router.post("/calculate")
-async def calculate_hydraulics_endpoint(data: HydraulicsInput) -> HydraulicsResult:
+@router.post(
+    "/calculate",
+    response_model=HydraulicsResult,
+    summary="Calculate well hydraulics",
+)
+async def calculate_hydraulics_endpoint(
+    data: HydraulicsInput,
+) -> HydraulicsResult:
     """
     Calculate pressure profile and hydraulics parameters using the selected correlation
     """
     try:
-        logger.info(f"Received hydraulics calculation request using {data.method} method")
+        logger.info(f"Received hydraulics calculation request {data.method}")
         result = calculate_hydraulics(data)
         logger.info(f"Calculation completed: BHP={result.bottomhole_pressure:.2f} psia")
         return result

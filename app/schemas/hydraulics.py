@@ -39,8 +39,10 @@ class WellboreGeometryInput(BaseModel):
     roughness: float = Field(0.0006, description="Pipe roughness, in")
     depth_steps: int = Field(100, description="Number of calculation steps")
 
-
-
+class SurveyData(BaseModel):
+    md: float = Field(..., description="Measured depth of the survey, ft")
+    tvd: float = Field(..., description="True vertical depth at the survey depth, ft")
+    inclination: float = Field(..., description="Inclination at the survey depth, degrees")
 
 class HydraulicsInput(BaseModel):
     fluid_properties: FluidPropertiesInput
@@ -60,7 +62,7 @@ class HydraulicsInput(BaseModel):
     surface_pressure: float = Field(..., description="Surface pressure, psia")
     bhp_mode: Literal["calculate", "target"] = "calculate"
     target_bhp: Optional[float] = Field(None, description="Target bottomhole pressure, psia")
-    
+    survey_data: Optional[List[SurveyData]] = Field(None, description="Survey data")
 
 class FlowPatternResult(BaseModel):
     depth: float

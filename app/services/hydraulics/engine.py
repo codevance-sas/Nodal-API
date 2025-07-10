@@ -46,41 +46,41 @@ from .extensions.compressor import (
     critical_flow_calculation
 )
 
+def calculate_hydraulics_method(data: HydraulicsInput) -> HydraulicsResult:
+    """
+    Calculate hydraulics based on selected method.
+    """
+    calculate = {
+        "hagedorn-brown": calculate_hagedorn_brown,
+        "duns-ross": calculate_duns_ross,
+        "chokshi": calculate_chokshi,
+        "orkiszewski": calculate_orkiszewski,
+        "gray": calculate_gray,
+        "mukherjee-brill": calculate_mukherjee_brill,
+        "aziz": calculate_aziz,
+        "hasan-kabir": calculate_hasan_kabir,
+        "ansari": calculate_ansari,
+        "beggs-brill": calculate_beggs_brill,
+    }
+    method = data.method.lower()
+    
+    if method not in calculate:
+        raise ValueError(f"Method {method} not supported")
+    # Standard calculation from surface to bottomhole
+    return calculate.get(method)(data)
+
 
 def calculate_hydraulics(data: HydraulicsInput) -> HydraulicsResult:
     """
     Main function to calculate hydraulics based on selected method.
     This is the primary entry point for the hydraulics module.
     """
-    method = data.method.lower()
     
     # Check if we need to calculate bottomhole pressure from target
     if data.bhp_mode == "target" and data.target_bhp is not None:
         return calculate_from_target_bhp(data)
-    
-    # Standard calculation from surface to bottomhole
-    if method == "hagedorn-brown":
-        return calculate_hagedorn_brown(data)
-    elif method == "beggs-brill":
-        return calculate_beggs_brill(data)
-    elif method == "duns-ross":
-        return calculate_duns_ross(data)
-    elif method == "chokshi":
-        return calculate_chokshi(data)
-    elif method == "orkiszewski":
-        return calculate_orkiszewski(data)
-    elif method == "gray":
-        return calculate_gray(data)
-    elif method == "mukherjee-brill":
-        return calculate_mukherjee_brill(data)
-    elif method == "aziz":
-        return calculate_aziz(data)
-    elif method == "hasan-kabir":
-        return calculate_hasan_kabir(data)
-    elif method == "ansari":
-        return calculate_ansari(data)
-    else:
-        raise ValueError(f"Unknown method: {method}")
+
+    return calculate_hydraulics_method(data)
 
 
 def calculate_from_target_bhp(data: HydraulicsInput) -> HydraulicsResult:
