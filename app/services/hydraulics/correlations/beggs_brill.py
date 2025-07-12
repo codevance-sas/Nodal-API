@@ -66,8 +66,20 @@ def calculate_beggs_brill(data: HydraulicsInput) -> HydraulicsResult:
     g_c = 32.17    # ft·lbm/(lbf·s^2), unit conversion factor
     g = 32.2       # ft/s^2, gravitational acceleration
 
+    # Initialize arrays to store segment-wise results
+    num_segments = len(segments)
+    holdups = np.zeros(num_segments)
+    mixture_densities = np.zeros(num_segments)
+    mixture_velocities = np.zeros(num_segments)
+    reynolds_numbers = np.zeros(num_segments)
+    friction_factors = np.zeros(num_segments)
+    dpdz_elevation = np.zeros(num_segments)
+    dpdz_friction = np.zeros(num_segments)
+    dpdz_acceleration = np.zeros(num_segments)
+    dpdz_total = np.zeros(num_segments)
+
     # Stepwise calculation down the wellbore for each segment
-    for start_md, end_md, segment_length, inclination_rad in segments:
+    for i, (start_md, end_md, segment_length, inclination_rad) in enumerate(segments):
         # Find the correct pipe segment for the current depth
         current_pipe_segment = None
         for pipe_seg in wellbore.pipe_segments:
