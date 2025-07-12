@@ -42,7 +42,7 @@ class CorrelationBase(ABC):
         for segment in self.wellbore.pipe_segments:
             if segment.start_depth <= depth <= segment.end_depth:
                 return segment
-        return None
+        return self.wellbore.pipe_segments[-1]
 
     def _calculate_fluid_properties(self, p: float, T: float):
         return calculate_fluid_properties(
