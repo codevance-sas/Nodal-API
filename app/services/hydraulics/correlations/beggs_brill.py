@@ -349,8 +349,8 @@ def calculate_beggs_brill(data: HydraulicsInput) -> HydraulicsResult:
             flow_pattern_results.append(FlowPatternResult(
                 depth=point.depth,
                 flow_pattern=point.flow_pattern or FlowPatternEnum.BUBBLE,
-                liquid_holdup=point.liquid_holdup,
-                mixture_velocity=point.mixture_velocity,
+                liquid_holdup=point.liquid_holdup if point.liquid_holdup is not None else 0.0,
+                mixture_velocity=point.mixture_velocity if point.mixture_velocity is not None else 0.0,
                 superficial_liquid_velocity=v_sl, # Note: This is the value from the last segment
                 superficial_gas_velocity=v_sg  # Note: This is the value from the last segment
             ))
