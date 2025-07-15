@@ -111,11 +111,12 @@ class BeggsBrill(CorrelationBase):
             self.friction_factors[i] = f_tp
             self.dpdz_friction[i] = f_tp * (rho_ns * v_m**2) / (2.0 * self.G_C * D * 144.0)
 
-            # (c) Acceleration gradient (excluded)
-            self.dpdz_acceleration[i] = 0.0
+            # (c) Acceleration gradient
+            e_k = (rho_s * v_m * v_sg) / (self.G_C * p * 144.0)
+            self.dpdz_acceleration[i] = e_k
 
             # Total gradient and pressure update
-            self.dpdz_total[i] = self.dpdz_elevation[i] + self.dpdz_friction[i]
+            self.dpdz_total[i] = (self.dpdz_elevation[i] + self.dpdz_friction[i]) / (1.0 - e_k)
             dz = self.depth_points[i+1] - self.depth_points[i]
             self.pressures[i+1] = self.pressures[i] + self.dpdz_total[i] * dz
 
