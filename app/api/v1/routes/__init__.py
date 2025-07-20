@@ -1,19 +1,24 @@
-# backend/app/api/v1/routes/__init__.py
 from fastapi import APIRouter
 
-router = APIRouter()
+# Import all the individual routers
+from . import auth, core, gas_pipeline, hydraulics, ipr, operators, pipeline, pvt, surveys, wells
 
-# Import routes to include them in the router
-from app.api.v1.routes.hydraulics import router as hydraulics_router
-from app.api.v1.routes.pvt import router as pvt_router
+# Public router (for authentication)
+auth_router = APIRouter()
+auth_router.include_router(auth.router, prefix="/auth", tags=["auth"])
 
-# Include routers
-router.include_router(hydraulics_router, prefix="/hydraulics")
-router.include_router(pvt_router, prefix="/pvt")
+# Protected router (for all other API endpoints)
+protected_api_router = APIRouter()
+protected_api_router.include_router(core.router, prefix="/core", tags=["core"])
+protected_api_router.include_router(gas_pipeline.router, prefix="/gas_pipeline", tags=["gas_pipeline"])
+protected_api_router.include_router(hydraulics.router, prefix="/hydraulics", tags=["hydraulics"])
+protected_api_router.include_router(ipr.router, prefix="/ipr", tags=["ipr"])
+protected_api_router.include_router(operators.router, prefix="/operators", tags=["operators"])
+protected_api_router.include_router(pipeline.router, prefix="/pipeline", tags=["pipeline"])
+protected_api_router.include_router(pvt.router, prefix="/pvt", tags=["pvt"])
+protected_api_router.include_router(surveys.router, prefix="/surveys", tags=["surveys"])
+protected_api_router.include_router(wells.router, prefix="/wells", tags=["wells"])
 
-
-# backend/app/schemas/__init__.py
-# Empty file, just to mark as a package
 
 
 # backend/app/services/hydraulics/__init__.py
