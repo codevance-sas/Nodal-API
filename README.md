@@ -45,6 +45,57 @@ Comprehensive wellbore flow calculations include:
 - `GET /hydraulics/methods`: List available correlation methods
 - `GET /hydraulics/example-input`: Get example input for hydraulics calculations
 
+## Authentication
+
+The API uses JWT (JSON Web Token) based authentication to secure endpoints. 
+
+### Authentication in Development Mode
+
+For development and testing purposes, the API provides a simplified authentication process:
+
+1. **Generate Development Tokens**:
+   ```
+   POST /api/auth/dev-token?email=your.email@example.com
+   ```
+   This endpoint returns both access and refresh tokens that can be used for testing.
+
+2. **Test Authentication**:
+   ```
+   GET /api/auth/test-auth
+   ```
+   Use this endpoint to verify that your authentication is working correctly.
+
+3. **Using Swagger UI with Authentication**:
+   - Navigate to `/docs` in your browser
+   - Call the `/auth/dev-token` endpoint with your email
+   - Copy the `access_token` from the response
+   - Click the "Authorize" button at the top of the page
+   - Enter the token in the format: `Bearer your_token_here`
+   - Click "Authorize" and close the dialog
+   - Now you can test authenticated endpoints
+
+### Authentication in Production
+
+In production, the API uses OAuth with Google for authentication:
+
+1. **Login**:
+   ```
+   GET /api/auth/login
+   ```
+   Redirects to Google's authentication page.
+
+2. **Refresh Token**:
+   ```
+   POST /api/auth/refresh
+   ```
+   Refreshes an expired access token using a valid refresh token.
+
+3. **Logout**:
+   ```
+   POST /api/auth/logout
+   ```
+   Logs out the user by clearing authentication cookies.
+
 ## Using the API
 
 ### PVT Analysis Example

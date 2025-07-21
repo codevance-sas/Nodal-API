@@ -4,74 +4,134 @@ import logging
 import traceback
 from typing import Dict, Any, Optional
 
+from fastapi import HTTPException, status
+
 logger = logging.getLogger(__name__)
 
-class CalculationError(Exception):
-    """Base class for calculation errors"""
-    def __init__(self, message: str, details: Optional[Dict[str, Any]] = None):
+class APIError(Exception):
+    """Base class for API errors"""
+    def __init__(
+        self, 
+        message: str, 
+        status_code: int = status.HTTP_500_INTERNAL_SERVER_ERROR,
+        error_code: str = "internal_error",
+        details: Optional[Dict[str, Any]] = None
+    ):
         self.message = message
+        self.status_code = status_code
+        self.error_code = error_code
         self.details = details or {}
         super().__init__(message)
 
-class PipelineCalculationError(CalculationError):
-    """Specific error for pipeline calculations"""
-    pass
+class ValidationError(APIError):
+    """Error for validation failures"""
+    def __init__(self, message: str, details: Optional[Dict[str, Any]] = None):
+        super().__init__(
+            message=message,
+            status_code=status.HTTP_400_BAD_REQUEST,
+            error_code="validation_error",
+            details=details
+        )
 
-class HydraulicsCalculationError(CalculationError):
-    """Specific error for hydraulics calculations"""
-    pass
+class AuthenticationError(APIError):
+    """Error for authentication failures"""
+    def __init__(self, message: str, details: Optional[Dict[str, Any]] = None):
+        super().__init__(
+            message=message,
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            error_code="authentication_error",
+            details=details
+        )
 
-class PVTCalculationError(CalculationError):
-    """Specific error for PVT calculations"""
-    pass
+class AuthorizationError(APIError):
+    """Error for authorization failures"""
+    def __init__(self, message: str, details: Optional[Dict[str, Any]] = None):
+        super().__init__(
+            message=message,
+            status_code=status.HTTP_403_FORBIDDEN,
+            error_code="authorization_error",
+            details=details
+        )
 
-def handle_calculation_error(func):
+class NotFoundError(APIError):
+    """Error for resource not found"""
+    def __init__(self, message: str, details: Optional[Dict[str, Any]] = None):
+        super().__init__(
+            message=message,
+            status_code=status.HTTP_404_NOT_FOUND,
+            error_code="not_found",
+            details=details
+        )
+
+class CalculationError(APIError):
+    """Error for calculation failures"""
+    def __init__(self, message: str, details: Optional[Dict[str, Any]] = None):
+        super().__init__(
+            message=message,
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            error_code="calculation_error",
+            details=details
+        )
+
+def handle_api_error(error: Exception) -> HTTPException:
     """
-    Decorator for handling calculation errors with proper logging
+    Convert any exception to an appropriate HTTPException.
+    This provides consistent error handling across the application.
     
     Args:
-        func: Function to decorate
+        error: The exception to handle
         
     Returns:
-        Wrapped function with error handling
+        HTTPException with appropriate status code and details
     """
-    def wrapper(*args, **kwargs):
-        try:
-            return func(*args, **kwargs)
-        except CalculationError as e:
-            # Already formatted error, just log and re-raise
-            logger.error(f"{type(e).__name__}: {e.message}")
-            raise
-        except Exception as e:
-            # Format generic error for better traceability
-            tb = traceback.format_exc()
-            logger.error(f"Error in {func.__name__}: {str(e)}\n{tb}")
-            
-            # Create appropriate error type based on function name/module
-            module_name = func.__module__.split('.')[-1] if hasattr(func, '__module__') else ""
-            if 'pipeline' in module_name or 'pipeline' in func.__name__:
-                raise PipelineCalculationError(str(e), {
-                    "function": func.__name__,
-                    "args": str(args),
-                    "kwargs": str(kwargs),
-                })
-            elif 'hydraulics' in module_name or 'hydraulics' in func.__name__:
-                raise HydraulicsCalculationError(str(e), {
-                    "function": func.__name__,
-                    "args": str(args),
-                    "kwargs": str(kwargs),
-                })
-            elif 'pvt' in module_name or 'pvt' in func.__name__:
-                raise PVTCalculationError(str(e), {
-                    "function": func.__name__,
-                    "args": str(args),
-                    "kwargs": str(kwargs),
-                })
-            else:
-                raise CalculationError(str(e), {
-                    "function": func.__name__,
-                    "args": str(args),
-                    "kwargs": str(kwargs),
-                })
+    if isinstance(error, APIError):
+        # For our custom API errors, use their status code and details
+        return HTTPException(
+            status_code=error.status_code,
+            detail={
+                "error": error.error_code,
+                "message": error.message,
+                "details": error.details
+            }
+        )
+    elif isinstance(error, HTTPException):
+        # For FastAPI's HTTPException, just return it
+        return error
+    else:
+        # For unexpected errors, log the full traceback and return a generic error
+        tb = traceback.format_exc()
+        logger.error(f"Unexpected error: {str(error)}\n{tb}")
+        
+        return HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                "error": "internal_error",
+                "message": "An unexpected error occurred",
+                "details": {"error_type": type(error).__name__}
+            }
+        )
+
+def error_response(
+    message: str,
+    status_code: int = status.HTTP_500_INTERNAL_SERVER_ERROR,
+    error_code: str = "internal_error",
+    details: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
+    """
+    Create a standardized error response dictionary.
     
-    return wrapper
+    Args:
+        message: Error message
+        status_code: HTTP status code
+        error_code: Error code for the client
+        details: Additional error details
+        
+    Returns:
+        Standardized error response dictionary
+    """
+    return {
+        "error": error_code,
+        "message": message,
+        "status_code": status_code,
+        "details": details or {}
+    }

@@ -1,12 +1,35 @@
-version: '3'
-
 services:
   app:
     build:
       context: .
       dockerfile: Dockerfile
+    restart: unless-stopped
     ports:
       - "8000:8000"
-    volumes:
-      - ./app:/app/app
+    env_file:
+      - .env
+    environment:
+      - DB_HOST=${DB_HOST:-db}
+      - DB_PORT=${DB_PORT:-5432}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
+      - SECRET_KEY=${SECRET_KEY}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - REDIRECT_URL=${REDIRECT_URL:-http://localhost:8000/api/auth/callback}
+      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3000}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - nodal-network
+
+networks:
+  nodal-network:
+    driver: bridge
 

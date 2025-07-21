@@ -1,6 +1,7 @@
 # backend/app/services/hydraulics/engine.py
 import numpy as np
 import copy
+import logging
 from typing import Dict, Any, List, Optional, Literal, Tuple
 
 from app.schemas.hydraulics import (
@@ -9,6 +10,10 @@ from app.schemas.hydraulics import (
 )
 
 from .utils import calculate_fluid_properties
+from .extensions.pipeline_cache import cached_calculation, memoize
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 # Import from correlations
 from .correlations import (
@@ -70,6 +75,7 @@ def calculate_hydraulics_method(data: HydraulicsInput) -> HydraulicsResult:
     return calculate.get(method)(data)
 
 
+@cached_calculation(ttl_seconds=3600)
 def calculate_hydraulics(data: HydraulicsInput) -> HydraulicsResult:
     """
     Main function to calculate hydraulics based on selected method.
@@ -83,17 +89,21 @@ def calculate_hydraulics(data: HydraulicsInput) -> HydraulicsResult:
     return calculate_hydraulics_method(data)
 
 
+@cached_calculation(ttl_seconds=3600)
 def calculate_from_target_bhp(data: HydraulicsInput) -> HydraulicsResult:
     """
     Calculate pressure profile and surface pressure given a target bottomhole pressure.
     Uses iterative approach to match the target BHP.
     """
-    # Create a copy of the input data for calculation
-    calc_data = copy.deepcopy(data)
-    calc_data.bhp_mode = "calculate"  # Switch to calculation mode
-    
-    # Initial guess for surface pressure (50% of target BHP as starting point)
-    calc_data.surface_pressure = data.target_bhp * 0.5
+    # Create a modified copy of the input data for calculation (avoid deep copy for performance)
+    calc_data = HydraulicsInput(
+        fluid_properties=data.fluid_properties,
+        wellbore_geometry=data.wellbore_geometry,
+        method=data.method,
+        surface_pressure=data.target_bhp * 0.5,  # Initial guess (50% of target BHP)
+        bhp_mode="calculate",  # Switch to calculation mode
+        target_bhp=data.target_bhp
+    )
     
     # Maximum iterations and tolerance
     max_iterations = 20
@@ -149,6 +159,7 @@ def calculate_from_target_bhp(data: HydraulicsInput) -> HydraulicsResult:
     return result
 
 
+@cached_calculation(ttl_seconds=3600)
 def compare_methods(data: HydraulicsInput, methods: List[str] = None) -> Dict[str, Any]:
     """
     Compare results from different hydraulics correlations.
@@ -170,9 +181,15 @@ def compare_methods(data: HydraulicsInput, methods: List[str] = None) -> Dict[st
     results = {}
     
     for method in methods:
-        # Create a copy of the data with the current method
-        method_data = copy.deepcopy(data)
-        method_data.method = method
+        # Create a new input object with the current method (avoid deep copy)
+        method_data = HydraulicsInput(
+            fluid_properties=data.fluid_properties,
+            wellbore_geometry=data.wellbore_geometry,
+            method=method,
+            surface_pressure=data.surface_pressure,
+            bhp_mode=data.bhp_mode,
+            target_bhp=data.target_bhp
+        )
         
         # Calculate results for this method
         try:
@@ -186,6 +203,7 @@ def compare_methods(data: HydraulicsInput, methods: List[str] = None) -> Dict[st
                 "success": True
             }
         except Exception as e:
+            logger.warning(f"Method {method} failed: {str(e)}")
             results[method] = {
                 "error": str(e),
                 "success": False
@@ -269,72 +287,146 @@ def recommend_method(data: HydraulicsInput) -> str:
             return "hagedorn-brown"
 
 
+@cached_calculation(ttl_seconds=3600)
 def flow_rate_sensitivity(data, min_oil_rate, max_oil_rate, steps, water_cut, gor):
     """
     Perform sensitivity analysis on flow rates
+    
+    Args:
+        data: Base hydraulics input data
+        min_oil_rate: Minimum oil rate to evaluate (STB/d)
+        max_oil_rate: Maximum oil rate to evaluate (STB/d)
+        steps: Number of steps between min and max
+        water_cut: Water cut as fraction
+        gor: Gas-oil ratio (scf/STB)
+        
+    Returns:
+        Dictionary with sensitivity analysis results
     """
     # Calculate oil rates to evaluate
     oil_rates = np.linspace(min_oil_rate, max_oil_rate, steps)
     
     results = []
     for oil_rate in oil_rates:
-        # Create modified input data
-        input_data = copy.deepcopy(data)
-        input_data.fluid_properties.oil_rate = oil_rate
-        input_data.fluid_properties.water_rate = oil_rate * water_cut / (1 - water_cut) if water_cut < 1 else 0
-        input_data.fluid_properties.gas_rate = oil_rate * gor / 1000  # Convert to Mscf/d
+        # Calculate water and gas rates
+        water_rate = oil_rate * water_cut / (1 - water_cut) if water_cut < 1 else 0
+        gas_rate = oil_rate * gor / 1000  # Convert to Mscf/d
         
-        # Calculate result
-        result = calculate_hydraulics(input_data)
+        # Create new input data (avoid deep copy)
+        input_data = HydraulicsInput(
+            fluid_properties={
+                **data.fluid_properties.dict(),  # Copy existing properties
+                "oil_rate": oil_rate,
+                "water_rate": water_rate,
+                "gas_rate": gas_rate
+            },
+            wellbore_geometry=data.wellbore_geometry,
+            method=data.method,
+            surface_pressure=data.surface_pressure,
+            bhp_mode=data.bhp_mode,
+            target_bhp=data.target_bhp
+        )
         
-        # Store key data
-        results.append({
-            "oil_rate": oil_rate,
-            "total_liquid_rate": oil_rate + input_data.fluid_properties.water_rate,
-            "bhp": result.bottomhole_pressure,
-            "pressure_drop": result.overall_pressure_drop,
-            "elevation_pct": result.elevation_drop_percentage,
-            "friction_pct": result.friction_drop_percentage
-        })
+        try:
+            # Calculate result
+            result = calculate_hydraulics(input_data)
+            
+            # Store key data
+            results.append({
+                "oil_rate": oil_rate,
+                "total_liquid_rate": oil_rate + water_rate,
+                "bhp": result.bottomhole_pressure,
+                "pressure_drop": result.overall_pressure_drop,
+                "elevation_pct": result.elevation_drop_percentage,
+                "friction_pct": result.friction_drop_percentage
+            })
+        except Exception as e:
+            logger.warning(f"Flow rate sensitivity calculation failed for rate {oil_rate}: {str(e)}")
+            # Add a placeholder result with error information
+            results.append({
+                "oil_rate": oil_rate,
+                "total_liquid_rate": oil_rate + water_rate,
+                "error": str(e)
+            })
     
     return {
         "sensitivity_type": "flow_rate",
-        "results": results
+        "results": results,
+        "parameters": {
+            "min_oil_rate": min_oil_rate,
+            "max_oil_rate": max_oil_rate,
+            "steps": steps,
+            "water_cut": water_cut,
+            "gor": gor
+        }
     }
 
 
+@cached_calculation(ttl_seconds=3600)
 def tubing_sensitivity(data, min_tubing_id, max_tubing_id, steps):
     """
     Perform sensitivity analysis on tubing diameter
+    
+    Args:
+        data: Base hydraulics input data
+        min_tubing_id: Minimum tubing inner diameter to evaluate (inches)
+        max_tubing_id: Maximum tubing inner diameter to evaluate (inches)
+        steps: Number of steps between min and max
+        
+    Returns:
+        Dictionary with sensitivity analysis results
     """
     # Calculate tubing sizes to evaluate
     tubing_sizes = np.linspace(min_tubing_id, max_tubing_id, steps)
     
     results = []
     for tubing_id in tubing_sizes:
-        # Create modified input data
-        input_data = copy.deepcopy(data)
-        input_data.wellbore_geometry.tubing_id = tubing_id
+        # Create new input data (avoid deep copy)
+        input_data = HydraulicsInput(
+            fluid_properties=data.fluid_properties,
+            wellbore_geometry={
+                **data.wellbore_geometry.dict(),  # Copy existing properties
+                "tubing_id": tubing_id
+            },
+            method=data.method,
+            surface_pressure=data.surface_pressure,
+            bhp_mode=data.bhp_mode,
+            target_bhp=data.target_bhp
+        )
         
-        # Calculate result
-        result = calculate_hydraulics(input_data)
-        
-        # Calculate effective flow area
-        flow_area = np.pi * (tubing_id/24)**2  # ft²
-        
-        # Store key data
-        results.append({
-            "tubing_id": tubing_id,
-            "flow_area": flow_area,
-            "bhp": result.bottomhole_pressure,
-            "pressure_drop": result.overall_pressure_drop,
-            "elevation_pct": result.elevation_drop_percentage,
-            "friction_pct": result.friction_drop_percentage
-        })
+        try:
+            # Calculate result
+            result = calculate_hydraulics(input_data)
+            
+            # Calculate effective flow area
+            flow_area = np.pi * (tubing_id/24)**2  # ft²
+            
+            # Store key data
+            results.append({
+                "tubing_id": tubing_id,
+                "flow_area": flow_area,
+                "bhp": result.bottomhole_pressure,
+                "pressure_drop": result.overall_pressure_drop,
+                "elevation_pct": result.elevation_drop_percentage,
+                "friction_pct": result.friction_drop_percentage
+            })
+        except Exception as e:
+            logger.warning(f"Tubing sensitivity calculation failed for diameter {tubing_id}: {str(e)}")
+            # Add a placeholder result with error information
+            results.append({
+                "tubing_id": tubing_id,
+                "flow_area": np.pi * (tubing_id/24)**2,
+                "error": str(e)
+            })
     
     return {
         "sensitivity_type": "tubing_size",
-        "results": results
+        "results": results,
+        "parameters": {
+            "min_tubing_id": min_tubing_id,
+            "max_tubing_id": max_tubing_id,
+            "steps": steps
+        }
     }
 
 
@@ -873,6 +965,7 @@ def calculate_compressor_station(
     return comp_results
 
 
+@cached_calculation(ttl_seconds=3600)
 def design_gas_lift_system(
     wellhead_pressure: float,     # wellhead pressure, psia
     wellhead_temperature: float,  # wellhead temperature, °F
@@ -955,15 +1048,37 @@ def design_gas_lift_system(
     # If gas lift is needed, determine required gas injection rate
     gas_rates = []
     bhp_values = []
+    optimal_bhp = None
     
     if gas_lift_needed:
         # Try different gas rates to find optimal
         test_gas_rates = np.linspace(100, 2000, 10)  # Mscf/d
         
         for gas_rate in test_gas_rates:
-            # Create hydraulics input with gas lift
-            gas_lift_input = copy.deepcopy(natural_flow_input)
-            gas_lift_input.fluid_properties.gas_rate = gas_rate
+            # Create hydraulics input with gas lift (avoid deep copy)
+            gas_lift_input = HydraulicsInput(
+                fluid_properties={
+                    "oil_rate": oil_rate,
+                    "water_rate": water_rate,
+                    "gas_rate": gas_rate,  # Add gas lift
+                    "oil_gravity": 35.0,
+                    "water_gravity": 1.05,
+                    "gas_gravity": gas_gravity,
+                    "bubble_point": 2000.0,
+                    "temperature_gradient": temp_gradient,
+                    "surface_temperature": wellhead_temperature
+                },
+                wellbore_geometry={
+                    "depth": gas_injection_depth,
+                    "deviation": 0.0,
+                    "tubing_id": tubing_id,
+                    "roughness": 0.0006,
+                    "depth_steps": 100
+                },
+                method=method,
+                surface_pressure=wellhead_pressure,
+                bhp_mode="calculate"
+            )
             
             # Calculate BHP with gas lift
             try:
@@ -971,7 +1086,7 @@ def design_gas_lift_system(
                 gas_rates.append(gas_rate)
                 bhp_values.append(gas_lift_result.bottomhole_pressure)
             except Exception as e:
-                # Skip failed calculations
+                logger.warning(f"Gas lift calculation failed for rate {gas_rate}: {str(e)}")
                 continue
     
     # Find optimal gas rate (where BHP just below formation pressure)
@@ -985,16 +1100,37 @@ def design_gas_lift_system(
                 break
         
         # If no gas rate gives BHP below formation pressure, use max rate
-        if optimal_gas_rate == 0.0:
+        if optimal_gas_rate == 0.0 and gas_rates:
             optimal_gas_rate = gas_rates[-1]
-            optimal_bhp = bhp_values[-1]
+            optimal_bhp = bhp_values[-1] if bhp_values else None
     
     # Calculate valve operating pressures
     valve_data = []
-    if gas_lift_needed:
-        # Create hydraulics input with optimal gas lift
-        optimal_input = copy.deepcopy(natural_flow_input)
-        optimal_input.fluid_properties.gas_rate = optimal_gas_rate
+    if gas_lift_needed and optimal_gas_rate > 0:
+        # Create hydraulics input with optimal gas lift (avoid deep copy)
+        optimal_input = HydraulicsInput(
+            fluid_properties={
+                "oil_rate": oil_rate,
+                "water_rate": water_rate,
+                "gas_rate": optimal_gas_rate,
+                "oil_gravity": 35.0,
+                "water_gravity": 1.05,
+                "gas_gravity": gas_gravity,
+                "bubble_point": 2000.0,
+                "temperature_gradient": temp_gradient,
+                "surface_temperature": wellhead_temperature
+            },
+            wellbore_geometry={
+                "depth": gas_injection_depth,
+                "deviation": 0.0,
+                "tubing_id": tubing_id,
+                "roughness": 0.0006,
+                "depth_steps": 100
+            },
+            method=method,
+            surface_pressure=wellhead_pressure,
+            bhp_mode="calculate"
+        )
         
         # Calculate hydraulics with optimal gas lift
         optimal_result = calculate_hydraulics(optimal_input)
@@ -1013,14 +1149,13 @@ def design_gas_lift_system(
             avg_temp_r = wellhead_temperature + temp_gradient * depth/2 + 460
             avg_casing_pressure = wellhead_pressure * 1.5  # Simplified assumption
             
-            # Calculate gas density
-            if z_factor is None:
-                # Simple z-factor correlation
-                p_pc = 756.8 - 131.0 * gas_gravity - 3.6 * gas_gravity**2
-                t_pc = 169.2 + 349.5 * gas_gravity - 74.0 * gas_gravity**2
-                p_pr = avg_casing_pressure / p_pc
-                t_pr = avg_temp_r / t_pc
-                z_factor = 1.0 - 0.06 * p_pr / t_pr  # simplified correlation
+            # Calculate z-factor (define it here to fix the undefined variable issue)
+            # Simple z-factor correlation
+            p_pc = 756.8 - 131.0 * gas_gravity - 3.6 * gas_gravity**2
+            t_pc = 169.2 + 349.5 * gas_gravity - 74.0 * gas_gravity**2
+            p_pr = avg_casing_pressure / p_pc
+            t_pr = avg_temp_r / t_pc
+            z_factor = 1.0 - 0.06 * p_pr / t_pr  # simplified correlation
             
             # Calculate gas density in casing
             gas_density = 0.0764 * gas_gravity * avg_casing_pressure / (z_factor * avg_temp_r)

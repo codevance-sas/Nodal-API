@@ -1,37 +1,60 @@
-from datetime import datetime, timedelta, timezone
-from jose import JWTError, jwt
-from app.core.config import settings
+"""
+JWT Manager Module - Wrapper around TokenService
+
+This module provides JWT token management functions by delegating to the TokenService class.
+It maintains the same interface for backward compatibility while eliminating code duplication.
+"""
+
+import logging
+from datetime import timedelta
+from typing import Dict, Optional, Any
+
 from fastapi import HTTPException
 
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30  # 30 minutes
-REFRESH_TOKEN_EXPIRE_DAYS = 7     # 7 days
+from app.services.auth.token_service import token_service
 
-def create_access_token(data: dict):
-    """Creates a short-lived access token."""
-    to_encode = data.copy()
-    expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    to_encode.update({"exp": expire, "type": "access"})
-    encoded_jwt = jwt.encode(to_encode, settings.JWT_SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
+# Configure logging
+logger = logging.getLogger(__name__)
 
-def create_refresh_token(data: dict):
-    """Creates a long-lived refresh token."""
-    to_encode = data.copy()
-    expire = datetime.now(timezone.utc) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
-    to_encode.update({"exp": expire, "type": "refresh"})
-    encoded_jwt = jwt.encode(to_encode, settings.JWT_SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
+    """
+    Creates a short-lived access token with standard claims.
+    
+    Args:
+        data: Dictionary containing claims to include in the token
+        expires_delta: Optional custom expiration time
+        
+    Returns:
+        JWT token string
+    """
+    return token_service.create_access_token(data=data, expires_delta=expires_delta)
 
-def verify_token(token: str, credentials_exception: HTTPException):
+def create_refresh_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
+    """
+    Creates a long-lived refresh token with standard claims.
+    
+    Args:
+        data: Dictionary containing claims to include in the token
+        expires_delta: Optional custom expiration time
+        
+    Returns:
+        JWT token string
+    """
+    return token_service.create_refresh_token(data=data, expires_delta=expires_delta)
+
+def verify_token(token: str, credentials_exception: HTTPException) -> Dict[str, Any]:
     """
     Verifies a token and returns its payload.
-    Raises credentials_exception if the token is invalid.
+    Performs comprehensive validation of token claims.
+    
+    Args:
+        token: JWT token string to verify
+        credentials_exception: Exception to raise if validation fails
+        
+    Returns:
+        Dictionary containing the token claims
+        
+    Raises:
+        HTTPException: If token validation fails
     """
-    try:
-        payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[ALGORITHM])
-        if payload.get("sub") is None:
-            raise credentials_exception
-        return payload
-    except JWTError:
-        raise credentials_exception
+    return token_service.verify_token(token=token, credentials_exception=credentials_exception)
