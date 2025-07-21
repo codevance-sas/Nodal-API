@@ -34,7 +34,7 @@ class TokenService:
         Returns:
             JWT token string
         """
-        to_encode = self.encode_data(data, expires_delta)
+        to_encode = self.encode_data(data, expires_delta, token_type="access")
         
         # Encode the token
         try:
@@ -73,7 +73,7 @@ class TokenService:
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Could not create refresh token"
             )
-    def encode_data(self, data: dict, expires_delta: Optional[timedelta] = None) -> dict:
+    def encode_data(self, data: dict, expires_delta: Optional[timedelta] = None, token_type: str = "refresh") -> dict:
         to_encode = data.copy()
 
         # Set expiration time
@@ -90,7 +90,7 @@ class TokenService:
             "exp": expire,
             "iat": iat,
             "jti": jti,
-            "type": "refresh",
+            "type": token_type,
             "iss": "nodal-api"  # Issuer
         })
 
