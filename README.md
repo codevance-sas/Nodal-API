@@ -53,13 +53,7 @@ The API uses JWT (JSON Web Token) based authentication to secure endpoints.
 
 For development and testing purposes, the API provides a simplified authentication process:
 
-1. **Generate Development Tokens**:
-   ```
-   POST /api/auth/dev-token?email=your.email@example.com
-   ```
-   This endpoint returns both access and refresh tokens that can be used for testing.
-
-2. **Check Admin User**:
+1. **Check Admin User**:
    ```
    POST /api/auth/check-admin
    ```
@@ -73,7 +67,7 @@ For development and testing purposes, the API provides a simplified authenticati
    }
    ```
 
-3. **Test Authentication**:
+2. **Test Authentication**:
    ```
    GET /api/auth/test-auth
    ```
@@ -81,7 +75,7 @@ For development and testing purposes, the API provides a simplified authenticati
 
 3. **Using Swagger UI with Authentication**:
    - Navigate to `/docs` in your browser
-   - Call the `/auth/dev-token` endpoint with your email
+   - Use the `/auth/login` endpoint to log in with your credentials
    - Copy the `access_token` from the response
    - Click the "Authorize" button at the top of the page
    - Enter the token in the format: `Bearer your_token_here`

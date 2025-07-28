@@ -173,29 +173,6 @@ async def get_all_tokens(
     
     return TokenListResponse(tokens=token_dicts, total=len(token_dicts))
 
-@router.get('/admin/users', response_model=List[UserResponse])
-async def get_all_users(
-    skip: int = 0,
-    limit: int = 100,
-    current_user: dict = Depends(get_admin_user),  # Only admin users can access this endpoint
-    db: Session = Depends(session)
-):
-    """
-    Get all users with pagination.
-    This endpoint is only available to users with the ADMIN role.
-    """
-    users = auth_service.get_users(db, skip, limit)
-    
-    # Convert to UserResponse objects
-    user_responses = []
-    for user in users:
-        user_responses.append(UserResponse(
-            email=user.email,
-            role=user.role,
-            is_active=user.is_active
-        ))
-    
-    return user_responses
 
 # OAuth routes have been removed as part of the authentication system refactoring
 
@@ -308,56 +285,6 @@ async def logout(response: Response):
     auth_service.clear_auth_cookies(response)
     return {"message": "Successfully logged out"}
 
-@router.post("/dev-token", summary="Generate tokens for development/testing")
-async def generate_dev_token(email: str, response: Response):
-    """
-    Generates access and refresh tokens for development and testing purposes.
-    This endpoint is only available in development mode.
-    
-    - **email**: Email to use as the subject of the token
-    
-    Returns both tokens directly in the response body and also sets them as cookies.
-    """
-    # Only available in development mode
-    if not settings.DEBUG:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Endpoint not found"
-        )
-    
-    try:
-        # Create token payload
-        token_data = {
-            "sub": email,
-            "name": f"Test User ({email})",
-            "picture": ""
-        }
-        
-        # Generate tokens
-        access_token = token_service.create_access_token(data=token_data)
-        refresh_token = token_service.create_refresh_token(data=token_data)
-        
-        # Set cookies for convenience
-        csrf_token = auth_service.set_auth_cookies(response, access_token, refresh_token)
-        
-        # Return tokens directly in response body for easy copying
-        return {
-            "access_token": access_token,
-            "refresh_token": refresh_token,
-            "token_type": "bearer",
-            "csrf_token": csrf_token,
-            "user": {
-                "email": email,
-                "name": f"Test User ({email})"
-            },
-            "note": "These tokens are for development/testing only. Copy the access_token for use with Swagger UI."
-        }
-    except Exception as e:
-        logger.error(f"Error generating development tokens: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to generate tokens"
-        )
 
 @router.post("/check-admin", response_model=AdminCheckResponse, summary="Check if admin exists and create one if not")
 async def check_admin(
