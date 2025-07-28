@@ -18,6 +18,22 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
     REFRESH_TOKEN_EXPIRE_DAYS: int = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "7"))
+    AUTH_TOKEN_EXPIRE_DAYS: int = int(os.getenv("AUTH_TOKEN_EXPIRE_DAYS", "2"))
+    
+    # EMAIL SETTINGS
+    SMTP_SERVER: str = os.getenv("SMTP_SERVER", "smtp.gmail.com")
+    SMTP_PORT: int = int(os.getenv("SMTP_PORT", "587"))
+    SMTP_USERNAME: str = os.getenv("SMTP_USERNAME", "")
+    SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "")
+    SMTP_USE_TLS: bool = os.getenv("SMTP_USE_TLS", "True").lower() == "true"
+    FROM_EMAIL: str = os.getenv("FROM_EMAIL", "noreply@example.com")
+    ALLOWED_EMAIL_DOMAINS: List[str] = []
+    
+    @field_validator("ALLOWED_EMAIL_DOMAINS", mode="before")
+    def parse_allowed_domains(cls, v: Optional[str]) -> List[str]:
+        if isinstance(v, str):
+            return [domain.strip().lower() for domain in v.split(",") if domain.strip()]
+        return []
     
     # CORS SETTINGS
     BACKEND_CORS_ORIGINS: List[str] = [
@@ -36,10 +52,8 @@ class Settings(BaseSettings):
         raise ValueError(v)
     
     # AUTHENTICATION SETTINGS
-    GOOGLE_CLIENT_ID: Optional[str] = os.getenv("GOOGLE_CLIENT_ID")
-    GOOGLE_CLIENT_SECRET: Optional[str] = os.getenv("GOOGLE_CLIENT_SECRET")
-    REDIRECT_URL: str = os.getenv("REDIRECT_URL", "http://localhost:8000/api/auth/callback")
     FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:3000")
+    SUPER_USER_EMAIL: str = os.getenv("SUPER_USER_EMAIL", "admin@example.com")
     
     # DATABASE SETTINGS
     DB_HOST: str = os.getenv("DB_HOST", "localhost")

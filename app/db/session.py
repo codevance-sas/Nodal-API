@@ -1,8 +1,9 @@
 import logging
-from typing import Generator
+from typing import Generator, List, Set
 from sqlmodel import create_engine, Session, SQLModel
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.pool import QueuePool
+from sqlalchemy import inspect
 
 from app.core.config import settings
 
@@ -31,10 +32,30 @@ except Exception as e:
     raise
 
 def create_db_and_tables():
-    """Create database tables if they don't exist"""
+    """Create only the database tables that don't exist yet"""
     try:
-        SQLModel.metadata.create_all(engine)
-        logger.info("Database tables created successfully")
+        # Get inspector to check existing tables
+        inspector = inspect(engine)
+        existing_tables = set(inspector.get_table_names())
+        
+        # Get all tables defined in SQLModel metadata
+        metadata_tables = set(SQLModel.metadata.tables.keys())
+        
+        # Find tables that need to be created (in metadata but not in database)
+        tables_to_create = metadata_tables - existing_tables
+        
+        if not tables_to_create:
+            logger.info("All tables already exist in the database")
+            return
+            
+        # Create only the tables that don't exist
+        for table_name in tables_to_create:
+            if table_name in SQLModel.metadata.tables:
+                table = SQLModel.metadata.tables[table_name]
+                table.create(engine)
+                logger.info(f"Created table: {table_name}")
+        
+        logger.info(f"Created {len(tables_to_create)} new tables")
     except SQLAlchemyError as e:
         logger.error(f"Error creating database tables: {e}")
         raise

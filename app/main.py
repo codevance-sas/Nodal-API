@@ -11,6 +11,7 @@ from app.api.v1.routes import auth_router, protected_api_router
 from app.api.v1.routes.auth import get_current_user
 from app.core.config import settings
 from app.db.session import create_db_and_tables
+import app.models  # Import all models to ensure they are registered with SQLModel.metadata
 
 # Configure logging
 logging.basicConfig(
@@ -54,17 +55,24 @@ app = FastAPI(
     
     ## Authentication
     
-    This API uses JWT Bearer tokens for authentication.
+    This API uses email-based token authentication. The flow is:
     
-    In development mode, you can easily get a token by using the `/auth/dev-token` endpoint:
+    1. Request a token by calling `POST /auth/request-token` with your email
+    2. Check your email for the token (valid for 2 days)
+    3. Validate the token by calling `POST /auth/validate-token` with the token
+    4. Use the returned JWT token for authentication
     
-    1. Call `POST /auth/dev-token?email=your.email@example.com`
-    2. Copy the `access_token` from the response
-    3. Click the "Authorize" button at the top of this page
-    4. Enter the token in the format: `Bearer your_token_here`
-    5. Click "Authorize" and close the dialog
+    For API testing, you can use the token in the format: `Bearer your_token_here`
+    
+    1. Copy the `access_token` from the validation response
+    2. Click the "Authorize" button at the top of this page
+    3. Enter the token in the format: `Bearer your_token_here`
+    4. Click "Authorize" and close the dialog
     
     Now all your API requests will include the authentication token.
+    
+    Note: Only emails with allowed domains can request tokens, and a token cannot be 
+    regenerated for the same email until it expires or is used, unless done by an admin.
     """,
     version="1.0.0",
     root_path=settings.API_V1_STR,

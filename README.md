@@ -59,7 +59,21 @@ For development and testing purposes, the API provides a simplified authenticati
    ```
    This endpoint returns both access and refresh tokens that can be used for testing.
 
-2. **Test Authentication**:
+2. **Check Admin User**:
+   ```
+   POST /api/auth/check-admin
+   ```
+   Checks if an admin user exists in the system. If no admin exists, you can provide user data to create one:
+   ```
+   POST /api/auth/check-admin
+   {
+     "email": "admin@example.com",
+     "password": "securepassword",
+     "password_confirm": "securepassword"
+   }
+   ```
+
+3. **Test Authentication**:
    ```
    GET /api/auth/test-auth
    ```
