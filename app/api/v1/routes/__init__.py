@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 
 # Import all the individual routers
-from . import auth, core, gas_pipeline, hydraulics, ipr, operators, pipeline, pvt, surveys, wells
+from . import auth, core, gas_pipeline, hydraulics, ipr, operators, pipeline, pvt, surveys, users, wells
 
 # Public router (for authentication)
 auth_router = APIRouter()
@@ -17,6 +17,7 @@ protected_api_router.include_router(operators.router, prefix="/operators", tags=
 protected_api_router.include_router(pipeline.router, prefix="/pipeline", tags=["pipeline"])
 protected_api_router.include_router(pvt.router, prefix="/pvt", tags=["pvt"])
 protected_api_router.include_router(surveys.router, prefix="/surveys", tags=["surveys"])
+protected_api_router.include_router(users.router, prefix="/users", tags=["users"])
 protected_api_router.include_router(wells.router, prefix="/wells", tags=["wells"])
 
 
