@@ -37,6 +37,23 @@ class AuthTokenCRUD:
         db.refresh(token)
         
         return token
+        
+    @staticmethod
+    def delete_token_by_email(db: Session, email: str) -> bool:
+        """
+        Delete an auth token record by email.
+        
+        Args:
+            db: Database session
+            email: The email address of the token to delete
+            
+        Returns:
+            True if a token was deleted, False otherwise
+        """
+        result = db.query(AuthToken).filter(AuthToken.email == email).delete()
+        db.commit()
+        
+        return result > 0
     
     @staticmethod
     def get_token_by_email(db: Session, email: str) -> Optional[AuthToken]:

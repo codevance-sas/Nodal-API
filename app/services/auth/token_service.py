@@ -45,10 +45,25 @@ class TokenService:
         # Check if the email domain is allowed
         if not email_service.is_domain_allowed(email):
             return False, "Email domain not allowed"
-            
-        # Check if a token can be generated for this email
-        if not is_admin_generated and not auth_token_crud.can_generate_token(db, email):
-            return False, "A valid token already exists for this email"
+        
+        # Always check if a token exists for this email
+        existing_token = auth_token_crud.get_token_by_email(db, email)
+        
+        # If a token exists and it's not admin-generated, return an error message
+        if existing_token and not is_admin_generated and not auth_token_crud.can_generate_token(db, email):
+            # Format the expiration time
+            expiration_time = existing_token.expires_at.strftime("%Y-%m-%d %H:%M:%S UTC")
+            return False, f"Ya existe un token válido para este correo electrónico. El token expira el {expiration_time}. Por favor, revise su bandeja de entrada o espere a que el token actual expire."
+        
+        # If a token exists, delete it in the following cases:
+        # 1. It's admin-generated
+        # 2. It's expired
+        # 3. It's already used
+        if existing_token:
+            now = datetime.utcnow()
+            if is_admin_generated or existing_token.expires_at < now or existing_token.is_used:
+                logger.info(f"Deleting existing token for {email} before creating a new one.")
+                auth_token_crud.delete_token_by_email(db, email)
             
         # Generate a secure random token
         token = secrets.token_urlsafe(32)
@@ -56,14 +71,18 @@ class TokenService:
         # Hash the token for storage
         token_hash = hashlib.sha256(token.encode()).hexdigest()
         
-        # Store the token in the database
-        auth_token_crud.create_token(
-            db=db,
-            email=email,
-            token_hash=token_hash,
-            expires_in_days=self.auth_token_expire_days,
-            is_admin_generated=is_admin_generated
-        )
+        try:
+            # Store the token in the database
+            auth_token_crud.create_token(
+                db=db,
+                email=email,
+                token_hash=token_hash,
+                expires_in_days=self.auth_token_expire_days,
+                is_admin_generated=is_admin_generated
+            )
+        except Exception as e:
+            logger.error(f"Error creating token for {email}: {str(e)}")
+            return False, "Error creating token. Please try again later."
         
         # Send the token via email
         email_sent = await email_service.send_token_email(email, token)
