@@ -41,7 +41,7 @@ class AuthService:
             refresh_token: The JWT refresh token
             
         Returns:
-            CSRF token for CSRF protection
+            Empty string (previously returned CSRF token)
         """
         # Set refresh token in a secure HttpOnly cookie
         response.set_cookie(
@@ -54,28 +54,10 @@ class AuthService:
             path="/api/auth"  # Restrict to auth endpoints
         )
         
-        # Set access token in a secure cookie
-        response.set_cookie(
-            key="access_token",
-            value=access_token,
-            httponly=False,  # Frontend needs to read this
-            secure=settings.ENV == "production",  # Secure in production
-            samesite="lax",
-            max_age=60 * token_service.access_token_expire_minutes
-        )
+        # No longer setting access_token cookie as per requirements
+        # No longer setting csrf_token cookie as per requirements
         
-        # Set CSRF token for protection against CSRF attacks
-        csrf_token = secrets.token_urlsafe(32)
-        response.set_cookie(
-            key="csrf_token",
-            value=csrf_token,
-            httponly=False,  # Frontend needs to read this
-            secure=settings.ENV == "production",
-            samesite="lax",
-            max_age=60 * 60 * 24  # 1 day
-        )
-        
-        return csrf_token
+        return ""  # Return empty string instead of CSRF token
     
     def clear_auth_cookies(self, response: Response) -> None:
         """
@@ -84,9 +66,8 @@ class AuthService:
         Args:
             response: The FastAPI response object
         """
-        response.delete_cookie(key="access_token")
+        # Only clear refresh_token as we no longer set access_token or csrf_token
         response.delete_cookie(key="refresh_token", path="/api/auth")
-        response.delete_cookie(key="csrf_token")
     
     def refresh_access_token(self, refresh_token: str) -> str:
         """
@@ -133,21 +114,14 @@ class AuthService:
     
     def validate_csrf_token(self, cookie_token: Optional[str], header_token: Optional[str]) -> None:
         """
-        Validates CSRF token.
+        Previously validated CSRF token, now a no-op as we no longer use CSRF tokens.
         
         Args:
-            cookie_token: CSRF token from cookie
-            header_token: CSRF token from header
-            
-        Raises:
-            HTTPException: If CSRF validation fails
+            cookie_token: CSRF token from cookie (ignored)
+            header_token: CSRF token from header (ignored)
         """
-        if not cookie_token or not header_token or cookie_token != header_token:
-            logger.warning("CSRF token validation failed")
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="CSRF token validation failed"
-            )
+        # No-op as we no longer use CSRF tokens
+        pass
             
     async def request_email_token(self, email: str, db: Session) -> Tuple[bool, str]:
         """

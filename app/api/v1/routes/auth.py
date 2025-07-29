@@ -224,18 +224,12 @@ def import_time():
 @router.post("/refresh", summary="Refresh access token")
 async def refresh_token_endpoint(
     response: Response, 
-    refresh_token: Optional[str] = Cookie(default=None),
-    csrf_token: Optional[str] = Cookie(default=None),
-    x_csrf_token: Optional[str] = Header(default=None)
+    refresh_token: Optional[str] = Cookie(default=None)
 ):
     """
     Takes a valid refresh token and returns a new access token.
-    Requires CSRF token validation.
     """
     try:
-        # Validate CSRF token
-        auth_service.validate_csrf_token(csrf_token, x_csrf_token)
-        
         if not refresh_token:
             logger.warning("Refresh token not found in request")
             raise HTTPException(
@@ -246,18 +240,8 @@ async def refresh_token_endpoint(
         # Create new access token
         new_access_token = auth_service.refresh_access_token(refresh_token)
         
-        # Set the new access token in a cookie
-        response.set_cookie(
-            key="access_token",
-            value=new_access_token,
-            httponly=False,
-            secure=settings.ENV == "production",
-            samesite="lax",
-            max_age=60 * auth_service.token_service.access_token_expire_minutes
-        )
-        
-        # Generate a new CSRF token
-        new_csrf_token = auth_service.set_auth_cookies(
+        # Update the refresh token cookie
+        auth_service.set_auth_cookies(
             response, 
             new_access_token, 
             refresh_token
@@ -265,8 +249,7 @@ async def refresh_token_endpoint(
         
         return {
             "access_token": new_access_token, 
-            "token_type": "bearer",
-            "csrf_token": new_csrf_token
+            "token_type": "bearer"
         }
     except HTTPException:
         raise
