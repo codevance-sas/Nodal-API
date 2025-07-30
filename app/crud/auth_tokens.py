@@ -1,9 +1,10 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_
 
 from app.models.auth_token import AuthToken
+from app.utils.datetime_utils import ensure_timezone_aware
 
 class AuthTokenCRUD:
     """
@@ -121,11 +122,12 @@ class AuthTokenCRUD:
         if not token:
             return True
             
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         
         # Token can be generated only if it's expired
         # We no longer check if the token is used since tokens can be used multiple times
-        return token.expires_at < now
+        # Ensure both datetimes are timezone-aware before comparison
+        return ensure_timezone_aware(token.expires_at) < now
     
     @staticmethod
     def delete_expired_tokens(db: Session) -> int:
@@ -138,8 +140,18 @@ class AuthTokenCRUD:
         Returns:
             Number of tokens deleted
         """
-        now = datetime.utcnow()
-        result = db.query(AuthToken).filter(AuthToken.expires_at < now).delete()
+        now = datetime.now(timezone.utc)
+        # We can't directly use ensure_timezone_aware in the query
+        # Instead, we'll fetch the records first and then filter them in Python
+        tokens = db.query(AuthToken).all()
+        expired_tokens = [token for token in tokens if ensure_timezone_aware(token.expires_at) < now]
+        
+        if not expired_tokens:
+            return 0
+            
+        # Delete the expired tokens
+        emails = [token.email for token in expired_tokens]
+        result = db.query(AuthToken).filter(AuthToken.email.in_(emails)).delete()
         db.commit()
         
         return result

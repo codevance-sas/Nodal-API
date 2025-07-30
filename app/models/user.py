@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List
 from enum import Enum
 from sqlmodel import SQLModel, Field, Column, DateTime, func, Relationship
@@ -43,7 +43,7 @@ class User(SQLModel, table=True):
         Returns:
             A new User instance
         """
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         
         return cls(
             email=email,

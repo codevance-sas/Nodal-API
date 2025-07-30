@@ -13,6 +13,7 @@ from app.core.config import settings
 from app.db.session import session
 from app.crud.auth_tokens import auth_token_crud
 from app.services.auth.email_service import email_service
+from app.utils.datetime_utils import ensure_timezone_aware
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -60,8 +61,9 @@ class TokenService:
         # 2. It's expired
         # We no longer check if the token is used since tokens can be used multiple times
         if existing_token:
-            now = datetime.utcnow()
-            if is_admin_generated or existing_token.expires_at < now:
+            now = datetime.now(timezone.utc)
+            # Ensure expires_at is timezone-aware before comparison
+            if is_admin_generated or ensure_timezone_aware(existing_token.expires_at) < now:
                 logger.info(f"Deleting existing token for {email} before creating a new one.")
                 auth_token_crud.delete_token_by_email(db, email)
             
@@ -113,8 +115,9 @@ class TokenService:
             return None
             
         # Check if the token is expired
-        now = datetime.utcnow()
-        if token_record.expires_at < now:
+        now = datetime.now(timezone.utc)
+        # Ensure expires_at is timezone-aware before comparison
+        if ensure_timezone_aware(token_record.expires_at) < now:
             return None
             
         # Removed check for token.is_used and no longer marking token as used

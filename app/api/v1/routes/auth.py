@@ -218,8 +218,8 @@ async def test_auth(current_user: dict = Depends(get_current_user)):
 
 # Helper function to get current time
 def import_time():
-    from datetime import datetime
-    return datetime.now()
+    from datetime import datetime, timezone
+    return datetime.now(timezone.utc)
 
 @router.post("/refresh", summary="Refresh access token")
 async def refresh_token_endpoint(

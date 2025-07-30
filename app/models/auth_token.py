@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from sqlmodel import SQLModel, Field, Column, DateTime, func
 
@@ -31,7 +31,7 @@ class AuthToken(SQLModel, table=True):
         Returns:
             A new AuthToken instance
         """
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         expires_at = now + timedelta(days=expires_in_days)
         
         return cls(
