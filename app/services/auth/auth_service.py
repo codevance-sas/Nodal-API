@@ -1,6 +1,7 @@
 import logging
 import secrets
 from typing import Optional, Tuple, List
+from datetime import datetime, timezone
 
 from fastapi import HTTPException, Response, status, Depends
 from sqlmodel import Session
@@ -14,6 +15,7 @@ from app.crud.auth_tokens import auth_token_crud
 from app.crud.users import user_crud
 from app.models.auth_token import AuthToken
 from app.models.user import User, UserRole
+from app.utils.datetime_utils import ensure_timezone_aware
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -148,7 +150,7 @@ class AuthService:
             Tuple of (success, message, access_token, refresh_token)
         """
         # Verify the email token
-        email = token_service.verify_email_token(token, db)
+        email, token_record = token_service.verify_email_token(token, db, return_record=True)
         
         if not email:
             return False, "Invalid or expired token", None, None
@@ -160,10 +162,17 @@ class AuthService:
             "picture": ""
         }
         
+        # Calculate remaining time for the email token
+        now = datetime.now(timezone.utc)
+        token_expires_at = ensure_timezone_aware(token_record.expires_at)
+        remaining_time = token_expires_at - now
+        
         # Create tokens
         try:
             access_token = token_service.create_access_token(data=jwt_payload)
-            refresh_token = token_service.create_refresh_token(data=jwt_payload)
+            # Pass the remaining time of the email token as the expiration time for the refresh token
+            # This ensures the refresh token cannot outlive the email token
+            refresh_token = token_service.create_refresh_token(data=jwt_payload, expires_delta=remaining_time)
             return True, "Token validated successfully", access_token, refresh_token
         except Exception as e:
             logger.error(f"Token creation failed: {str(e)}")
@@ -318,6 +327,59 @@ class AuthService:
             Updated User instance
         """
         return user_crud.set_user_role(db, user, role)
+    
+    def get_user_token(self, email: str, db: Session) -> Optional[dict]:
+        """
+        Get the token for a specific user by email.
+        
+        Args:
+            email: The email address to look up
+            db: Database session
+            
+        Returns:
+            Dictionary with token information if found, None otherwise
+        """
+        token = auth_token_crud.get_token_by_email(db, email)
+        
+        if not token:
+            return None
+            
+        # Check if the token is expired
+        now = datetime.now(timezone.utc)
+        # Ensure expires_at is timezone-aware before comparison
+        is_active = ensure_timezone_aware(token.expires_at) > now
+        
+        return {
+            "email": token.email,
+            "created_at": token.created_at,
+            "expires_at": token.expires_at,
+            "is_used": token.is_used,
+            "is_admin_generated": token.is_admin_generated,
+            "active": is_active
+        }
+    
+    def revoke_token(self, email: str, db: Session) -> Tuple[bool, str]:
+        """
+        Revoke (delete) a token for a specific user by email.
+        
+        Args:
+            email: The email address of the token to revoke
+            db: Database session
+            
+        Returns:
+            Tuple of (success, message)
+        """
+        token = auth_token_crud.get_token_by_email(db, email)
+        
+        if not token:
+            return False, "No token found for this email"
+            
+        success = auth_token_crud.delete_token_by_email(db, email)
+        
+        if success:
+            return True, "Token revoked successfully"
+        else:
+            return False, "Failed to revoke token"
 
 # Create a singleton instance
 auth_service = AuthService()

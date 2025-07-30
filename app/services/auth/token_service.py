@@ -3,7 +3,7 @@ import uuid
 import hashlib
 import secrets
 from datetime import datetime, timedelta, timezone
-from typing import Dict, Optional, Any, Tuple
+from typing import Dict, Optional, Any, Tuple, Union
 
 from jose import JWTError, jwt
 from fastapi import HTTPException, status, Depends
@@ -14,6 +14,7 @@ from app.db.session import session
 from app.crud.auth_tokens import auth_token_crud
 from app.services.auth.email_service import email_service
 from app.utils.datetime_utils import ensure_timezone_aware
+from app.models.auth_token import AuthToken
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -94,16 +95,18 @@ class TokenService:
             
         return True, "Token generated and sent successfully"
         
-    def verify_email_token(self, token: str, db: Session) -> Optional[str]:
+    def verify_email_token(self, token: str, db: Session, return_record: bool = False) -> Union[Optional[str], Tuple[Optional[str], Optional[AuthToken]]]:
         """
         Verify an email token and return the associated email if valid.
         
         Args:
             token: The token to verify
             db: Database session
+            return_record: Whether to return the token record along with the email
             
         Returns:
-            The email associated with the token if valid, None otherwise
+            If return_record is False: The email associated with the token if valid, None otherwise
+            If return_record is True: A tuple of (email, token_record) if valid, (None, None) otherwise
         """
         # Hash the token for lookup
         token_hash = hashlib.sha256(token.encode()).hexdigest()
@@ -112,18 +115,18 @@ class TokenService:
         token_record = auth_token_crud.get_token_by_hash(db, token_hash)
         
         if not token_record:
-            return None
+            return (None, None) if return_record else None
             
         # Check if the token is expired
         now = datetime.now(timezone.utc)
         # Ensure expires_at is timezone-aware before comparison
         if ensure_timezone_aware(token_record.expires_at) < now:
-            return None
+            return (None, None) if return_record else None
             
         # Removed check for token.is_used and no longer marking token as used
         # This allows tokens to be used multiple times until they expire
         
-        return token_record.email
+        return (token_record.email, token_record) if return_record else token_record.email
     
     def create_access_token(self, data: dict, expires_delta: Optional[timedelta] = None) -> str:
         """

@@ -17,6 +17,7 @@ from app.schemas.auth import (
     AdminCheckResponse, AllowedDomainCreate, AllowedDomainResponse, 
     AllowedDomainListResponse
 )
+from app.schemas.auth_token import UserTokenResponse, TokenRevokeResponse
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -174,6 +175,36 @@ async def get_all_tokens(
         })
     
     return TokenListResponse(tokens=token_dicts, total=total)
+
+
+@router.delete('/admin/token/{email}', response_model=TokenRevokeResponse, summary="Admin revoke user's token")
+async def admin_revoke_token(
+    email: str,
+    current_user: dict = Depends(get_admin_user),  # Only admin users can access this endpoint
+    db: Session = Depends(session)
+):
+    """
+    Revoke (delete) an authentication token for a specific user by email.
+    This endpoint is only available to users with the ADMIN role.
+    """
+    try:
+        success, message = auth_service.revoke_token(email, db)
+        
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=message
+            )
+        
+        return TokenRevokeResponse(success=success, message=message)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error revoking token for {email}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to revoke token for {email}"
+        )
 
 
 # OAuth routes have been removed as part of the authentication system refactoring
@@ -453,4 +484,65 @@ async def remove_allowed_domain(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to remove allowed domain"
+        )
+
+# Token Management Endpoints
+
+@router.get("/token", response_model=UserTokenResponse, summary="Get current user's token")
+async def get_user_token(
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(session)
+):
+    """
+    Get the authentication token for the current user.
+    This endpoint returns information about the user's email token,
+    including whether it's active (not expired).
+    """
+    try:
+        email = current_user["email"]
+        token_info = auth_service.get_user_token(email, db)
+        
+        if not token_info:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No token found for this user"
+            )
+        
+        return UserTokenResponse(**token_info)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting user token: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to get user token"
+        )
+
+@router.delete("/token", response_model=TokenRevokeResponse, summary="Revoke current user's token")
+async def revoke_user_token(
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(session)
+):
+    """
+    Revoke (delete) the authentication token for the current user.
+    This endpoint allows users to invalidate their email token.
+    """
+    try:
+        email = current_user["email"]
+        success, message = auth_service.revoke_token(email, db)
+        
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=message
+            )
+        
+        return TokenRevokeResponse(success=success, message=message)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error revoking user token: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to revoke user token"
         )
