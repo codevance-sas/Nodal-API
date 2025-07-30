@@ -107,8 +107,7 @@ class AuthTokenCRUD:
         Check if a token can be generated for an email.
         A token can be generated if:
         1. There is no existing token for the email, or
-        2. The existing token is expired, or
-        3. The existing token has been used
+        2. The existing token is expired
         
         Args:
             db: Database session
@@ -124,8 +123,9 @@ class AuthTokenCRUD:
             
         now = datetime.utcnow()
         
-        # Token can be generated if it's expired or used
-        return token.expires_at < now or token.is_used
+        # Token can be generated only if it's expired
+        # We no longer check if the token is used since tokens can be used multiple times
+        return token.expires_at < now
     
     @staticmethod
     def delete_expired_tokens(db: Session) -> int:

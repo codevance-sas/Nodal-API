@@ -58,10 +58,10 @@ class TokenService:
         # If a token exists, delete it in the following cases:
         # 1. It's admin-generated
         # 2. It's expired
-        # 3. It's already used
+        # We no longer check if the token is used since tokens can be used multiple times
         if existing_token:
             now = datetime.utcnow()
-            if is_admin_generated or existing_token.expires_at < now or existing_token.is_used:
+            if is_admin_generated or existing_token.expires_at < now:
                 logger.info(f"Deleting existing token for {email} before creating a new one.")
                 auth_token_crud.delete_token_by_email(db, email)
             
@@ -117,12 +117,8 @@ class TokenService:
         if token_record.expires_at < now:
             return None
             
-        # Check if the token has been used
-        if token_record.is_used:
-            return None
-            
-        # Mark the token as used
-        auth_token_crud.mark_token_as_used(db, token_record)
+        # Removed check for token.is_used and no longer marking token as used
+        # This allows tokens to be used multiple times until they expire
         
         return token_record.email
     
