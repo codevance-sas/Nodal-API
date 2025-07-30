@@ -65,6 +65,18 @@ class UserCRUD:
             List of User instances
         """
         return db.exec(select(User).offset(skip).limit(limit)).all()
+        
+    def count_users(self, db: Session) -> int:
+        """
+        Count all users in the database.
+        
+        Args:
+            db: Database session
+            
+        Returns:
+            Total number of users
+        """
+        return db.query(User).count()
     
     def update_user(self, db: Session, user: User, **kwargs) -> User:
         """

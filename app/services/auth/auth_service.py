@@ -182,7 +182,7 @@ class AuthService:
         """
         return await token_service.generate_email_token(email, db, is_admin_generated=True)
         
-    def get_all_tokens(self, db: Session, skip: int = 0, limit: int = 100) -> List[AuthToken]:
+    def get_all_tokens(self, db: Session, skip: int = 0, limit: int = 100) -> Tuple[List[AuthToken], int]:
         """
         Get all auth tokens with pagination.
         
@@ -192,9 +192,11 @@ class AuthService:
             limit: Maximum number of records to return
             
         Returns:
-            List of AuthToken instances
+            Tuple of (List of AuthToken instances, Total count of tokens)
         """
-        return auth_token_crud.get_all_tokens(db, skip, limit)
+        tokens = auth_token_crud.get_all_tokens(db, skip, limit)
+        total = auth_token_crud.count_tokens(db)
+        return tokens, total
     
     def register_user(self, email: str, password: str, db: Session) -> Tuple[bool, str, Optional[User]]:
         """
@@ -287,7 +289,7 @@ class AuthService:
         """
         return user_crud.get_user_by_email(db, email)
     
-    def get_users(self, db: Session, skip: int = 0, limit: int = 100) -> List[User]:
+    def get_users(self, db: Session, skip: int = 0, limit: int = 100) -> Tuple[List[User], int]:
         """
         Get all users with pagination.
         
@@ -297,9 +299,11 @@ class AuthService:
             limit: Maximum number of records to return
             
         Returns:
-            List of User instances
+            Tuple of (List of User instances, Total count of users)
         """
-        return user_crud.get_users(db, skip, limit)
+        users = user_crud.get_users(db, skip, limit)
+        total = user_crud.count_users(db)
+        return users, total
     
     def set_user_role(self, user: User, role: UserRole, db: Session) -> User:
         """

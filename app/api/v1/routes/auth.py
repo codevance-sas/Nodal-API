@@ -158,7 +158,7 @@ async def get_all_tokens(
     Get all auth tokens with pagination.
     This endpoint is only available to users with the ADMIN role.
     """
-    tokens = auth_service.get_all_tokens(db, skip, limit)
+    tokens, total = auth_service.get_all_tokens(db, skip, limit)
     
     # Convert to dictionary representation
     token_dicts = []
@@ -171,7 +171,7 @@ async def get_all_tokens(
             "is_admin_generated": token.is_admin_generated
         })
     
-    return TokenListResponse(tokens=token_dicts, total=len(token_dicts))
+    return TokenListResponse(tokens=token_dicts, total=total)
 
 
 # OAuth routes have been removed as part of the authentication system refactoring
@@ -189,14 +189,12 @@ async def read_users_me(current_user: dict = Depends(get_current_user), db: Sess
         # If the user doesn't exist in the database yet,
         # return the basic information from the token
         return UserResponse(
-            id=0,  # Default ID for users not in the database
             email=current_user["email"],
             role=current_user["role"],
             is_active=True
         )
     
     return UserResponse(
-        id=user.id,
         email=user.email,
         role=user.role,
         is_active=user.is_active

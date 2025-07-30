@@ -170,5 +170,18 @@ class AuthTokenCRUD:
             List of AuthToken instances
         """
         return db.query(AuthToken).offset(skip).limit(limit).all()
+        
+    @staticmethod
+    def count_tokens(db: Session) -> int:
+        """
+        Count all auth tokens in the database.
+        
+        Args:
+            db: Database session
+            
+        Returns:
+            Total number of auth tokens
+        """
+        return db.query(AuthToken).count()
 
 auth_token_crud = AuthTokenCRUD()

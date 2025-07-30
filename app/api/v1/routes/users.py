@@ -41,6 +41,7 @@ async def list_users(
     Only accessible by admin users.
     """
     users = user_crud.get_users(db, skip=skip, limit=limit)
+    total = user_crud.count_users(db)
     
     # Convert to response model
     user_responses = [
@@ -54,7 +55,7 @@ async def list_users(
     
     return UserListResponse(
         users=user_responses,
-        total=len(users)
+        total=total
     )
 
 @router.get("/{user_id}", response_model=UserResponse)
