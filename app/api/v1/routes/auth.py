@@ -189,12 +189,14 @@ async def read_users_me(current_user: dict = Depends(get_current_user), db: Sess
         # If the user doesn't exist in the database yet,
         # return the basic information from the token
         return UserResponse(
+            id=0,  # Default ID for users not in the database
             email=current_user["email"],
             role=current_user["role"],
             is_active=True
         )
     
     return UserResponse(
+        id=user.id,
         email=user.email,
         role=user.role,
         is_active=user.is_active
