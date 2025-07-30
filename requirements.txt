@@ -61,3 +61,4 @@ watchfiles==1.0.5
 websockets==15.0.1
 passlib==1.7.4
 bcrypt==4.1.2
+alembic==1.13.1

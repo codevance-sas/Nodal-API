@@ -44,7 +44,7 @@ class TokenService:
             Tuple of (success, message)
         """
         # Check if the email domain is allowed
-        if not email_service.is_domain_allowed(email):
+        if not email_service.is_domain_allowed(email, db):
             return False, "Email domain not allowed"
         
         # Always check if a token exists for this email
@@ -87,7 +87,7 @@ class TokenService:
             return False, "Error creating token. Please try again later."
         
         # Send the token via email
-        email_sent = await email_service.send_token_email(email, token)
+        email_sent = await email_service.send_token_email(email, token, db)
         
         if not email_sent:
             return False, "Failed to send email"

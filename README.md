@@ -32,6 +32,34 @@ Comprehensive wellbore flow calculations include:
 
 ## API Endpoints
 
+### Database Management
+
+The Nodal API uses [Alembic](https://alembic.sqlalchemy.org/) for database migrations, providing a robust way to manage database schema changes.
+
+#### API Endpoint
+
+- `POST /api/core/apply-migrations`: Apply pending database migrations (admin only)
+
+#### CLI Commands
+
+The project includes CLI commands for working with migrations:
+
+```bash
+# Generate a new migration
+python -m app.db.cli generate "Description of changes"
+
+# Apply all pending migrations
+python -m app.db.cli upgrade
+
+# View migration history
+python -m app.db.cli history
+
+# Check current revision
+python -m app.db.cli current
+```
+
+For more information about the database migration system, see [MIGRATIONS.md](MIGRATIONS.md).
+
 ### PVT Endpoints
 
 - `POST /api/pvt/curve`: Generate comprehensive PVT property curves
@@ -81,6 +109,34 @@ For development and testing purposes, the API provides a simplified authenticati
    - Enter the token in the format: `Bearer your_token_here`
    - Click "Authorize" and close the dialog
    - Now you can test authenticated endpoints
+
+### Managing Allowed Email Domains
+
+The API allows administrators to manage which email domains are allowed to request authentication tokens:
+
+1. **List Allowed Domains**:
+   ```
+   GET /api/auth/allowed-domains
+   ```
+   Lists all allowed email domains. Only accessible by admin users.
+
+2. **Add Allowed Domain**:
+   ```
+   POST /api/auth/allowed-domains
+   {
+     "domain": "example.com",
+     "description": "Company domain"
+   }
+   ```
+   Adds a new allowed email domain. Only accessible by admin users.
+
+3. **Remove Allowed Domain**:
+   ```
+   DELETE /api/auth/allowed-domains/{domain}
+   ```
+   Removes an allowed email domain. Only accessible by admin users.
+
+Note: If no domains are specified in the database, all email domains are allowed to request tokens.
 
 ### Authentication in Production
 

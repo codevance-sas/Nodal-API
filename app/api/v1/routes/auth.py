@@ -10,10 +10,12 @@ from app.api.v1.dependencies.auth import get_current_user, get_admin_user
 from app.db.session import session
 from app.models.user import UserRole, User
 from app.crud.users import user_crud
+from app.crud.allowed_domains import allowed_domain_crud
 from app.schemas.auth import (
     UserCreate, UserLogin, UserResponse, TokenResponse,
     EmailRequest, TokenRequest, AdminTokenRequest, TokenListResponse,
-    AdminCheckResponse
+    AdminCheckResponse, AllowedDomainCreate, AllowedDomainResponse, 
+    AllowedDomainListResponse
 )
 
 # Configure logging
@@ -336,4 +338,119 @@ async def check_admin(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to check/create admin user"
+        )
+
+# Allowed Domains Endpoints
+
+@router.get("/allowed-domains", response_model=AllowedDomainListResponse, summary="List all allowed email domains")
+async def list_allowed_domains(
+    skip: int = 0, 
+    limit: int = 100,
+    current_user: dict = Depends(get_admin_user),
+    db: Session = Depends(session)
+):
+    """
+    List all allowed email domains for token generation.
+    Only accessible by admin users.
+    """
+    try:
+        domains = allowed_domain_crud.get_all_domains(db, skip=skip, limit=limit)
+        total = allowed_domain_crud.count_domains(db)
+        
+        return AllowedDomainListResponse(
+            domains=[
+                AllowedDomainResponse(
+                    domain=domain.domain,
+                    created_at=domain.created_at,
+                    description=domain.description
+                ) for domain in domains
+            ],
+            total=total
+        )
+    except Exception as e:
+        logger.error(f"Error listing allowed domains: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to list allowed domains"
+        )
+
+@router.post("/allowed-domains", response_model=AllowedDomainResponse, summary="Add a new allowed email domain")
+async def add_allowed_domain(
+    domain_data: AllowedDomainCreate,
+    current_user: dict = Depends(get_admin_user),
+    db: Session = Depends(session)
+):
+    """
+    Add a new allowed email domain for token generation.
+    Only accessible by admin users.
+    """
+    try:
+        # Check if domain already exists
+        existing_domain = allowed_domain_crud.get_domain(db, domain_data.domain)
+        if existing_domain:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Domain '{domain_data.domain}' already exists"
+            )
+        
+        # Create new domain
+        domain = allowed_domain_crud.create_domain(
+            db, 
+            domain_data.domain,
+            domain_data.description
+        )
+        
+        return AllowedDomainResponse(
+            domain=domain.domain,
+            created_at=domain.created_at,
+            description=domain.description
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error adding allowed domain: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to add allowed domain"
+        )
+
+@router.delete("/allowed-domains/{domain}", response_model=Dict[str, Any], summary="Remove an allowed email domain")
+async def remove_allowed_domain(
+    domain: str,
+    current_user: dict = Depends(get_admin_user),
+    db: Session = Depends(session)
+):
+    """
+    Remove an allowed email domain from the list.
+    Only accessible by admin users.
+    """
+    try:
+        # Check if domain exists
+        existing_domain = allowed_domain_crud.get_domain(db, domain)
+        if not existing_domain:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Domain '{domain}' not found"
+            )
+        
+        # Delete domain
+        success = allowed_domain_crud.delete_domain(db, domain)
+        
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to delete domain"
+            )
+        
+        return {
+            "success": True,
+            "message": f"Domain '{domain}' removed successfully"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error removing allowed domain: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to remove allowed domain"
         )

@@ -10,7 +10,7 @@ from starlette.middleware.gzip import GZipMiddleware
 from app.api.v1.routes import auth_router, protected_api_router
 from app.api.v1.routes.auth import get_current_user
 from app.core.config import settings
-from app.db.session import create_db_and_tables
+from app.db.migrations import create_db_and_tables
 import app.models  # Import all models to ensure they are registered with SQLModel.metadata
 
 # Configure logging

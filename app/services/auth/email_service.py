@@ -4,7 +4,10 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from typing import List, Optional
 
+from sqlalchemy.orm import Session
 from app.core.config import settings
+from app.db.session import session
+from app.crud.allowed_domains import allowed_domain_crud
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -20,36 +23,40 @@ class EmailService:
         self.smtp_username = settings.SMTP_USERNAME
         self.smtp_password = settings.SMTP_PASSWORD
         self.from_email = settings.FROM_EMAIL
-        self.allowed_domains = settings.ALLOWED_EMAIL_DOMAINS
+        # We no longer use settings for allowed domains
+        # self.allowed_domains = settings.ALLOWED_EMAIL_DOMAINS
     
-    def is_domain_allowed(self, email: str) -> bool:
+    def is_domain_allowed(self, email: str, db: Session = None) -> bool:
         """
-        Check if the email domain is in the allowed domains list.
+        Check if the email domain is in the allowed domains list in the database.
         
         Args:
             email: The email address to check
+            db: Database session (optional, will create one if not provided)
             
         Returns:
             True if the domain is allowed, False otherwise
         """
-        if not self.allowed_domains:  # If no domains are specified, all are allowed
-            return True
-            
-        domain = email.split('@')[-1].lower()
-        return domain in self.allowed_domains
+        # Create a database session if one wasn't provided
+        if db is None:
+            with session() as db:
+                return allowed_domain_crud.is_domain_allowed(db, email)
+        else:
+            return allowed_domain_crud.is_domain_allowed(db, email)
     
-    async def send_token_email(self, to_email: str, token: str) -> bool:
+    async def send_token_email(self, to_email: str, token: str, db: Session = None) -> bool:
         """
         Send an email with an authentication token.
         
         Args:
             to_email: The recipient's email address
             token: The authentication token
+            db: Database session (optional)
             
         Returns:
             True if the email was sent successfully, False otherwise
         """
-        if not self.is_domain_allowed(to_email):
+        if not self.is_domain_allowed(to_email, db):
             logger.warning(f"Attempted to send token to non-allowed domain: {to_email}")
             return False
             

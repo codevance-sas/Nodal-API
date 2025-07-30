@@ -3,6 +3,10 @@ import secrets
 from typing import Any, List, Optional, Union
 from pydantic import PostgresDsn, field_validator, ValidationInfo
 from pydantic_settings import BaseSettings
+from dotenv import load_dotenv
+
+load_dotenv()
+
 
 
 class Settings(BaseSettings):
@@ -61,20 +65,16 @@ class Settings(BaseSettings):
     DB_USER: str = os.getenv("DB_USER", "postgres")
     DB_PASSWORD: str = os.getenv("DB_PASSWORD", "postgres")
     DB_NAME: str = os.getenv("DB_NAME", "nodal")
-    DATABASE_URI: Optional[PostgresDsn] = None
-
-    @field_validator("DATABASE_URI")
-    def assemble_db_connection(cls, v: Optional[str], values: ValidationInfo) -> Any:
-        if isinstance(v, str):
-            return v
-        return PostgresDsn.build(
-            scheme="postgresql+psycopg2",
-            username=values.data.get("DB_USER"),
-            password=values.data.get("DB_PASSWORD"),
-            host=values.data.get("DB_HOST"),
-            port=int(values.data.get("DB_PORT")),
-            path=f"{values.data.get('DB_NAME')}"
-        )
+    
+    # Build DATABASE_URI using the class variables that were loaded with os.getenv()
+    DATABASE_URI: Optional[PostgresDsn] = PostgresDsn.build(
+        scheme="postgresql+psycopg2",
+        username=os.getenv("DB_USER", "postgres"),
+        password=os.getenv("DB_PASSWORD", "postgres"),
+        host=os.getenv("DB_HOST", "localhost"),
+        port=int(os.getenv("DB_PORT", "5432")),
+        path=f"{os.getenv('DB_NAME', 'nodal')}"
+    )
     
     # LOGGING SETTINGS
     LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")

@@ -1,5 +1,6 @@
 from pydantic import BaseModel, EmailStr, Field, validator
 from typing import Optional, Dict, Any, List
+from datetime import datetime
 
 class UserCreate(BaseModel):
     """
@@ -74,4 +75,35 @@ class TokenListResponse(BaseModel):
     Schema for listing tokens.
     """
     tokens: List[Dict[str, Any]]
+    total: int
+
+class AllowedDomainCreate(BaseModel):
+    """
+    Schema for creating a new allowed domain.
+    """
+    domain: str
+    description: Optional[str] = None
+    
+    @validator('domain')
+    def domain_format(cls, v):
+        # Ensure domain is lowercase and stripped
+        domain = v.lower().strip()
+        # Basic validation that it looks like a domain
+        if not domain or '.' not in domain:
+            raise ValueError('Invalid domain format')
+        return domain
+
+class AllowedDomainResponse(BaseModel):
+    """
+    Schema for allowed domain response.
+    """
+    domain: str
+    created_at: datetime
+    description: Optional[str] = None
+
+class AllowedDomainListResponse(BaseModel):
+    """
+    Schema for listing allowed domains.
+    """
+    domains: List[AllowedDomainResponse]
     total: int
