@@ -34,6 +34,7 @@ class UserResponse(BaseModel):
     """
     Schema for user response without sensitive information.
     """
+    id: int
     email: EmailStr
     role: str
     is_active: bool

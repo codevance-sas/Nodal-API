@@ -45,6 +45,7 @@ async def list_users(
     # Convert to response model
     user_responses = [
         UserResponse(
+            id=user.id,
             email=user.email,
             role=user.role,
             is_active=user.is_active
@@ -74,6 +75,7 @@ async def get_user(
         )
     
     return UserResponse(
+        id=user.id,
         email=user.email,
         role=user.role,
         is_active=user.is_active
@@ -103,6 +105,7 @@ async def update_user(
     updated_user = user_crud.update_user(db, user, **update_data)
     
     return UserResponse(
+        id=updated_user.id,
         email=updated_user.email,
         role=updated_user.role,
         is_active=updated_user.is_active
@@ -130,6 +133,7 @@ async def activate_user(
     updated_user = user_crud.activate_user(db, user)
     
     return UserResponse(
+        id=updated_user.id,
         email=updated_user.email,
         role=updated_user.role,
         is_active=updated_user.is_active
@@ -157,6 +161,7 @@ async def deactivate_user(
     updated_user = user_crud.deactivate_user(db, user)
     
     return UserResponse(
+        id=updated_user.id,
         email=updated_user.email,
         role=updated_user.role,
         is_active=updated_user.is_active
@@ -185,6 +190,7 @@ async def set_user_role(
     updated_user = user_crud.set_user_role(db, user, role)
     
     return UserResponse(
+        id=updated_user.id,
         email=updated_user.email,
         role=updated_user.role,
         is_active=updated_user.is_active
