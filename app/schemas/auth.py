@@ -79,19 +79,29 @@ class TokenListResponse(BaseModel):
 
 class AllowedDomainCreate(BaseModel):
     """
-    Schema for creating a new allowed domain.
+    Schema for creating a new allowed domain or email.
     """
-    domain: str
-    description: Optional[str] = None
+    domain: str = Field(..., description="Domain name or email address to allow")
+    description: Optional[str] = Field(None, description="Optional description")
     
     @validator('domain')
-    def domain_format(cls, v):
-        # Ensure domain is lowercase and stripped
-        domain = v.lower().strip()
-        # Basic validation that it looks like a domain
-        if not domain or '.' not in domain:
-            raise ValueError('Invalid domain format')
-        return domain
+    @classmethod
+    def domain_format(cls, v: str) -> str:
+        import re
+        v = v.lower().strip()
+        
+        if '@' in v:
+            # Validate as email address
+            email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+            if not re.match(email_pattern, v):
+                raise ValueError('Invalid email address format')
+        else:
+            # Validate as domain
+            domain_pattern = r'^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+            if not re.match(domain_pattern, v):
+                raise ValueError('Invalid domain format')
+        
+        return v
 
 class AllowedDomainResponse(BaseModel):
     """
@@ -100,10 +110,42 @@ class AllowedDomainResponse(BaseModel):
     domain: str
     created_at: datetime
     description: Optional[str] = None
+    is_email: bool = Field(..., description="True if this is an email address, False if it's a domain")
+    
+    @classmethod
+    def from_orm(cls, obj):
+        return cls(
+            domain=obj.domain,
+            created_at=obj.created_at,
+            description=obj.description,
+            is_email=obj.is_email
+        )
 
 class AllowedDomainListResponse(BaseModel):
     """
     Schema for listing allowed domains.
     """
     domains: List[AllowedDomainResponse]
+    total: int
+
+class AllowedEmailCreate(BaseModel):
+    """
+    Schema for creating a new allowed email.
+    """
+    email: EmailStr
+    description: Optional[str] = None
+
+class AllowedEmailResponse(BaseModel):
+    """
+    Schema for allowed email response.
+    """
+    email: EmailStr
+    created_at: datetime
+    description: Optional[str] = None
+
+class AllowedEmailListResponse(BaseModel):
+    """
+    Schema for listing allowed emails.
+    """
+    emails: List[AllowedEmailResponse]
     total: int

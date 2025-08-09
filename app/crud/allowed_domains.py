@@ -11,12 +11,12 @@ class AllowedDomainCRUD:
     @staticmethod
     def create_domain(db: Session, domain: str, description: Optional[str] = None) -> AllowedDomain:
         """
-        Create a new allowed domain record.
+        Create a new allowed domain or email record.
         
         Args:
             db: Database session
-            domain: The domain name (e.g., "example.com")
-            description: Optional description or purpose of this domain
+            domain: The domain name (e.g., "example.com") or email address (e.g., "user@example.com")
+            description: Optional description or purpose of this domain/email
             
         Returns:
             The created AllowedDomain instance
@@ -94,21 +94,36 @@ class AllowedDomainCRUD:
     @staticmethod
     def is_domain_allowed(db: Session, email: str) -> bool:
         """
-        Check if the email domain is allowed.
+        Check if an email address is allowed based on domain or specific email rules.
         
         Args:
             db: Database session
-            email: The email address to check
+            email: Email address to check
             
         Returns:
-            True if the domain is allowed, False otherwise
+            True if the email is allowed, False otherwise
         """
-        # If there are no domains in the database, all are allowed
+        # If no domains/emails are configured, allow all
         if AllowedDomainCRUD.count_domains(db) == 0:
             return True
             
-        domain = email.split('@')[-1].lower()
-        return db.query(AllowedDomain).filter(AllowedDomain.domain == domain).first() is not None
+        email = email.lower().strip()
+        
+        # Get all allowed entries
+        allowed_entries = db.query(AllowedDomain).all()
+        
+        for entry in allowed_entries:
+            if entry.is_email:
+                # Check if the specific email is allowed
+                if entry.domain == email:
+                    return True
+            else:
+                # Check if the domain is allowed
+                domain = email.split('@')[1] if '@' in email else email
+                if entry.domain == domain:
+                    return True
+        
+        return False
 
 # Create a singleton instance
 allowed_domain_crud = AllowedDomainCRUD()

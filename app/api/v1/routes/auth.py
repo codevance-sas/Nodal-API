@@ -373,7 +373,7 @@ async def check_admin(
 
 # Allowed Domains Endpoints
 
-@router.get("/allowed-domains", response_model=AllowedDomainListResponse, summary="List all allowed email domains")
+@router.get("/allowed-domains", response_model=AllowedDomainListResponse, summary="List all allowed email domains and specific emails")
 async def list_allowed_domains(
     skip: int = 0, 
     limit: int = 100,
@@ -381,7 +381,7 @@ async def list_allowed_domains(
     db: Session = Depends(session)
 ):
     """
-    List all allowed email domains for token generation.
+    List all allowed email domains and specific email addresses for token generation.
     Only accessible by admin users.
     """
     try:
@@ -390,11 +390,8 @@ async def list_allowed_domains(
         
         return AllowedDomainListResponse(
             domains=[
-                AllowedDomainResponse(
-                    domain=domain.domain,
-                    created_at=domain.created_at,
-                    description=domain.description
-                ) for domain in domains
+                AllowedDomainResponse.from_orm(domain)
+                for domain in domains
             ],
             total=total
         )
@@ -405,63 +402,62 @@ async def list_allowed_domains(
             detail="Failed to list allowed domains"
         )
 
-@router.post("/allowed-domains", response_model=AllowedDomainResponse, summary="Add a new allowed email domain")
+@router.post("/allowed-domains", response_model=AllowedDomainResponse, summary="Add a new allowed email domain or specific email")
 async def add_allowed_domain(
     domain_data: AllowedDomainCreate,
     current_user: dict = Depends(get_admin_user),
     db: Session = Depends(session)
 ):
     """
-    Add a new allowed email domain for token generation.
+    Add a new allowed email domain or specific email address for token generation.
     Only accessible by admin users.
     """
     try:
         # Check if domain already exists
         existing_domain = allowed_domain_crud.get_domain(db, domain_data.domain)
         if existing_domain:
+            entry_type = "email" if '@' in domain_data.domain else "domain"
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Domain '{domain_data.domain}' already exists"
+                detail=f"{entry_type.capitalize()} '{domain_data.domain}' already exists"
             )
         
-        # Create new domain
+        # Create new domain or email
         domain = allowed_domain_crud.create_domain(
             db, 
             domain_data.domain,
             domain_data.description
         )
         
-        return AllowedDomainResponse(
-            domain=domain.domain,
-            created_at=domain.created_at,
-            description=domain.description
-        )
+        return AllowedDomainResponse.from_orm(domain)
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error adding allowed domain: {str(e)}")
+        entry_type = "email" if '@' in domain_data.domain else "domain"
+        logger.error(f"Error adding allowed {entry_type}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to add allowed domain"
+            detail=f"Failed to add allowed {entry_type}"
         )
 
-@router.delete("/allowed-domains/{domain}", response_model=Dict[str, Any], summary="Remove an allowed email domain")
+@router.delete("/allowed-domains/{domain}", response_model=Dict[str, Any], summary="Remove an allowed email domain or specific email")
 async def remove_allowed_domain(
     domain: str,
     current_user: dict = Depends(get_admin_user),
     db: Session = Depends(session)
 ):
     """
-    Remove an allowed email domain from the list.
+    Remove an allowed email domain or specific email address from the list.
     Only accessible by admin users.
     """
     try:
         # Check if domain exists
         existing_domain = allowed_domain_crud.get_domain(db, domain)
         if not existing_domain:
+            entry_type = "email" if '@' in domain else "domain"
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Domain '{domain}' not found"
+                detail=f"The {entry_type} '{domain}' is not in the allowed list"
             )
         
         # Delete domain
@@ -473,9 +469,10 @@ async def remove_allowed_domain(
                 detail="Failed to delete domain"
             )
         
+        entry_type = "email" if existing_domain.is_email else "domain"
         return {
             "success": True,
-            "message": f"Domain '{domain}' removed successfully"
+            "message": f"The {entry_type} '{domain}' has been removed from the allowed list"
         }
     except HTTPException:
         raise
