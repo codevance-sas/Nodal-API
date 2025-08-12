@@ -44,6 +44,7 @@ async def register(
         "success": True,
         "message": message,
         "user": UserResponse(
+            id=user.id,
             email=user.email,
             role=user.role,
             is_active=user.is_active

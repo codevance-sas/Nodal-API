@@ -39,7 +39,8 @@ class EmailService:
         """
         # Create a database session if one wasn't provided
         if db is None:
-            with session() as db:
+            from app.db.session import engine
+            with Session(engine) as db:
                 return allowed_domain_crud.is_domain_allowed(db, email)
         else:
             return allowed_domain_crud.is_domain_allowed(db, email)
