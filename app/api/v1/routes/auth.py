@@ -336,21 +336,31 @@ async def check_admin(
                 message="No admin user exists. Provide user data to create one."
             )
         
-        # Create admin user
-        success, message, user = auth_service.register_user(
-            user_data.email, 
-            user_data.password, 
-            db
-        )
-        
-        if not success:
+        # Create admin user - bypass domain validation for admin creation
+        try:
+            # Check if a user with this email already exists
+            existing_user = user_crud.get_user_by_email(db, user_data.email)
+            if existing_user:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="A user with this email already exists"
+                )
+                
+            # Hash the password
+            from app.services.auth.password_service import password_service
+            password_hash = password_service.hash_password(user_data.password)
+            
+            # Create the user directly with ADMIN role (bypassing domain validation)
+            user = user_crud.create_user(db, user_data.email, password_hash, UserRole.ADMIN)
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error creating admin user: {str(e)}")
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=message
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to create admin user"
             )
-        
-        # Set user role to admin
-        user = user_crud.set_user_role(db, user, UserRole.ADMIN)
         
         return AdminCheckResponse(
             admin_exists=True,
