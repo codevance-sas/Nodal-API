@@ -2,6 +2,7 @@ import math
 import numpy as np
 from .base import CorrelationBase
 from app.schemas.hydraulics import FlowPatternEnum, HydraulicsInput, HydraulicsResult
+from app.services.pvt.gas_props import calculate_z as calculate_z_factor, calculate_bg
 
 class BeggsBrill(CorrelationBase):
     """
@@ -53,7 +54,7 @@ class BeggsBrill(CorrelationBase):
 
             # --- START GAS LIFT LOGIC ---
             Qg_total_acfs = Qg_reservoir_acfs
-            
+
             if self.gas_lift_enabled and depth <= self.gas_lift_depth and self.gas_lift_volume_scfd > 0:
                 # 1. Convert injected gas from SCFD to ACFS (actual ft³/s)
                 # First, get Bg for the *injected gas* at current P, T
