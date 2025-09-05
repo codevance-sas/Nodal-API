@@ -50,10 +50,10 @@ class BeggsBrill(CorrelationBase):
             # Calculate fluid properties
             props = self._calculate_fluid_properties(p, T)
 
-            Qo, Qw, Qg_reservoir_acfs = self._convert_production_rates(props)
+            Qo, Qw, Qg_reservoir_acfd = self._convert_production_rates(props)
 
             # --- START GAS LIFT LOGIC ---
-            Qg_total_acfs = Qg_reservoir_acfs
+            Qg_total_acfd = Qg_reservoir_acfd
 
             if self.gas_lift_enabled and depth <= self.gas_lift_depth and self.gas_lift_volume_scfd > 0:
                 # 1. Convert injected gas from SCFD to ACFS (actual ft³/s)
@@ -69,13 +69,12 @@ class BeggsBrill(CorrelationBase):
                 bg_injected = calculate_bg(type('obj', (object,), injected_gas_data)(), z_injected) # bg is in ft³/scf
 
                 # 2. Convert standard volume to actual volume rate
-                injected_gas_scfs = self.gas_lift_volume_scfd / 86400.0 # SCF per second
-                injected_gas_acfs = injected_gas_scfs * bg_injected # Actual ft³ per second
+                injected_gas_acfd = self.gas_lift_volume_scfd * bg_injected # Actual ft³ per day
 
                 # 3. Add to the total gas rate
-                Qg_total_acfs += injected_gas_acfs
+                Qg_total_acfd += injected_gas_acfd
 
-            v_sl, v_sg, v_m = self._calculate_superficial_velocities(Qo, Qw, Qg_total_acfs, A)
+            v_sl, v_sg, v_m = self._calculate_superficial_velocities(Qo, Qw, Qg_total_acfd, A)
             self.v_sl_profile[i] = v_sl
             self.v_sg_profile[i] = v_sg
 
