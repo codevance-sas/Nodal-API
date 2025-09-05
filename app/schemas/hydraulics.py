@@ -44,6 +44,13 @@ class SurveyData(BaseModel):
     tvd: float = Field(..., description="True vertical depth at the survey depth, ft")
     inclination: float = Field(..., description="Inclination at the survey depth, degrees")
 
+class GasLiftConfig(BaseModel):
+    """Configuration for the gas lift system."""
+    enabled: bool = Field(False, description="Set to true to activate gas lift calculation.")
+    injection_depth: float = Field(0.0, description="The depth of gas injection, ft.")
+    injection_volume_scfd: float = Field(0.0, description="Total gas volume injected per day, SCFD.")
+    injected_gas_gravity: float = Field(0.65, description="Specific gravity of the injected gas (air=1).")
+
 class HydraulicsInput(BaseModel):
     fluid_properties: FluidPropertiesInput
     wellbore_geometry: WellboreGeometryInput
@@ -63,6 +70,7 @@ class HydraulicsInput(BaseModel):
     bhp_mode: Literal["calculate", "target"] = "calculate"
     target_bhp: Optional[float] = Field(None, description="Target bottomhole pressure, psia")
     survey_data: Optional[List[SurveyData]] = Field(None, description="Survey data")
+    gas_lift: GasLiftConfig | None = Field(None, description="Gas lift configuration.")
 
 class FlowPatternResult(BaseModel):
     depth: float
