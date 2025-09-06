@@ -1,6 +1,6 @@
 from .base import CorrelationBase
 from app.schemas.hydraulics import FlowPatternEnum, HydraulicsResult, HydraulicsInput
-import math
+from app.services.pvt.gas_props import calculate_z as calculate_z_factor, calculate_bg
 
 class HagedornBrown(CorrelationBase):
     def __init__(self, data):
