@@ -23,7 +23,8 @@ class BeggsBrill(CorrelationBase):
         self.gas_lift_enabled = self.gas_lift_config and self.gas_lift_config.enabled
         if self.gas_lift_enabled:
             self.gas_lift_depth = self.gas_lift_config.injection_depth
-            self.gas_lift_volume_scfd = self.gas_lift_config.injection_volume_scfd
+            # Convert from MCFD (frontend input) to SCFD for internal calculations
+            self.gas_lift_volume_scfd = self.gas_lift_config.injection_volume_mcfd * 1000
             self.injected_gas_gravity = self.gas_lift_config.injected_gas_gravity
 
     def calculate_pressure_profile(self):
@@ -68,7 +69,7 @@ class BeggsBrill(CorrelationBase):
                 z_injected = calculate_z_factor(type('obj', (object,), injected_gas_data)())
                 bg_injected = calculate_bg(type('obj', (object,), injected_gas_data)(), z_injected) # bg is in ft³/scf
 
-                # 2. Convert standard volume to actual volume rate
+                # 2. Convert standard volume to actual volume rate (SCFD already converted from MCFD)
                 injected_gas_acfd = self.gas_lift_volume_scfd * bg_injected # Actual ft³ per day
 
                 # 3. Add to the total gas rate

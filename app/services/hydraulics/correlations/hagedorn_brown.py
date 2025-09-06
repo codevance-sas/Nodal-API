@@ -7,10 +7,21 @@ class HagedornBrown(CorrelationBase):
         super().__init__(data)
         self.method_name = "Hagedorn-Brown (Pure)"
 
+                # --- START GAS LIFT MODIFICATION ---
+        # Store gas lift configuration from the input data
+        self.gas_lift_config = data.gas_lift
+        self.gas_lift_enabled = self.gas_lift_config and self.gas_lift_config.enabled
+        if self.gas_lift_enabled:
+            self.gas_lift_depth = self.gas_lift_config.injection_depth
+            # Convert from MCFD (frontend input) to SCFD for internal calculations
+            self.gas_lift_volume_scfd = self.gas_lift_config.injection_volume_mcfd * 1000
+            self.injected_gas_gravity = self.gas_lift_config.injected_gas_gravity
+
     def calculate_pressure_profile(self):
         for i in range(self.depth_steps - 1):
             p = self.pressures[i]
-            T = self.temperatures[i]
+            T = self.temperatures[i] 
+            T_rankine = T + 459.67
             depth = self.depth_points[i]
             segment = self._calculate_pipe_segment(depth)
             D = segment.diameter / 12
@@ -18,8 +29,35 @@ class HagedornBrown(CorrelationBase):
             roughness_rel = self.wellbore.roughness / (segment.diameter * 12)
 
             props = self._calculate_fluid_properties(p, T)
-            Qo, Qw, Qg = self._convert_production_rates(props)
-            v_sl, v_sg, v_m = self._calculate_superficial_velocities(Qo, Qw, Qg, A)
+
+            Qo, Qw, Qg_reservoir_acfd = self._convert_production_rates(props)
+
+            # --- START GAS LIFT LOGIC ---
+            Qg_total_acfd = Qg_reservoir_acfd
+
+            if self.gas_lift_enabled and depth <= self.gas_lift_depth and self.gas_lift_volume_scfd > 0:
+                # 1. Convert injected gas from SCFD to ACFS (actual ft³/s)
+                # First, get Bg for the *injected gas* at current P, T
+                # Create a temporary PVTInput-like object for the injected gas
+                injected_gas_data = {
+                    "pressure": p,
+                    "temperature": T_rankine,
+                    "gas_gravity": self.injected_gas_gravity
+                }
+                
+                z_injected = calculate_z_factor(type('obj', (object,), injected_gas_data)())
+                bg_injected = calculate_bg(type('obj', (object,), injected_gas_data)(), z_injected) # bg is in ft³/scf
+
+                # 2. Convert standard volume to actual volume rate (SCFD already converted from MCFD)
+                injected_gas_acfd = self.gas_lift_volume_scfd * bg_injected # Actual ft³ per day
+
+                # 3. Add to the total gas rate
+                Qg_total_acfd += injected_gas_acfd
+
+            # 4. Convert back to SCFD for the correlation
+            Qg_total_scfd = Qg_total_acfd / bg_injected
+
+            v_sl, v_sg, v_m = self._calculate_superficial_velocities(Qo, Qw, Qg_total_scfd, A)
             self.v_sl_profile[i] = v_sl
             self.v_sg_profile[i] = v_sg
 

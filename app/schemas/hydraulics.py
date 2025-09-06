@@ -48,7 +48,7 @@ class GasLiftConfig(BaseModel):
     """Configuration for the gas lift system."""
     enabled: bool = Field(False, description="Set to true to activate gas lift calculation.")
     injection_depth: float = Field(0.0, description="The depth of gas injection, ft.")
-    injection_volume_scfd: float = Field(0.0, description="Total gas volume injected per day, SCFD.")
+    injection_volume_mcfd: float = Field(0.0, description="Total gas volume injected per day, MCFD (frontend sends in thousands).")
     injected_gas_gravity: float = Field(0.65, description="Specific gravity of the injected gas (air=1).")
 
 class HydraulicsInput(BaseModel):
