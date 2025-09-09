@@ -21,7 +21,6 @@ class HagedornBrown(CorrelationBase):
         for i in range(self.depth_steps - 1):
             p = self.pressures[i]
             T = self.temperatures[i] 
-            T_rankine = T + 459.67
             depth = self.depth_points[i]
             segment = self._calculate_pipe_segment(depth)
             D = segment.diameter / 12
@@ -41,7 +40,7 @@ class HagedornBrown(CorrelationBase):
                 # Create a temporary PVTInput-like object for the injected gas
                 injected_gas_data = {
                     "pressure": p,
-                    "temperature": T_rankine,
+                    "temperature": T,
                     "gas_gravity": self.injected_gas_gravity
                 }
                 
