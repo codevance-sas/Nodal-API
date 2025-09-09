@@ -38,17 +38,18 @@ class HagedornBrown(CorrelationBase):
                 # 1. Convert injected gas from SCFD to ACFS (actual ft³/s)
                 # First, get Bg for the *injected gas* at current P, T
                 # Create a temporary PVTInput-like object for the injected gas
-                injected_gas_data = {
-                    "pressure": p,
-                    "temperature": T,
-                    "gas_gravity": self.injected_gas_gravity
-                }
+                gas_gravity = self.injected_gas_gravity
+                # injected_gas_data = {
+                #     "pressure": p,
+                #     "temperature": T,
+                #     "gas_gravity": gas_gravity
+                # }
                 
-                z_injected = calculate_z_factor(type('obj', (object,), injected_gas_data)())
-                bg_injected = calculate_bg(type('obj', (object,), injected_gas_data)(), z_injected) # bg is in ft³/scf
+                # z_injected = calculate_z_factor(type('obj', (object,), injected_gas_data)())
+                # bg_injected = calculate_bg(type('obj', (object,), injected_gas_data)(), z_injected) # bg is in ft³/scf
 
                 # 2. Convert standard volume to actual volume rate (SCFD already converted from MCFD)
-                injected_gas_acfd = self.gas_lift_volume_scfd * bg_injected # Actual ft³ per day
+                injected_gas_acfd = self.gas_lift_volume_scfd * gas_gravity # Actual ft³ per day
 
                 # 3. Add to the total gas rate
                 Qg_total_acfd += injected_gas_acfd
