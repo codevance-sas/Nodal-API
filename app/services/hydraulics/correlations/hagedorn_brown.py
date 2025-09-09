@@ -31,7 +31,7 @@ class HagedornBrown(CorrelationBase):
 
             Qo, Qw, Qg_reservoir_acfd = self._convert_production_rates(props)
 
-            Qg_total_acfd = self._calculate_gas_prod_rate_gas_lift(depth, Qg_reservoir_acfd)
+            Qg_total_acfd = self._calculate_gas_prod_rate_gas_lift(depth, p, T, Qg_reservoir_acfd)
 
             v_sl, v_sg, v_m = self._calculate_superficial_velocities(Qo, Qw, Qg_total_acfd, A)
             self.v_sl_profile[i] = v_sl

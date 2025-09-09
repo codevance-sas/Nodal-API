@@ -300,7 +300,7 @@ class CorrelationBase(ABC):
             # Laminar flow
             return 64.0 / Re
 
-    def _calculate_gas_prod_rate_gas_lift(self, Qg_reservoir: float) -> float:
+    def _calculate_gas_prod_rate_gas_lift(self, depth: float, p: float, T: float, Qg_reservoir: float) -> float:
         # --- START GAS LIFT LOGIC ---
             Qg_total_acfd = Qg_reservoir
 

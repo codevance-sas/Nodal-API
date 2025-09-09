@@ -51,6 +51,7 @@ class Chokshi(CorrelationBase):
             # Calculate fluid properties
             props = self._calculate_fluid_properties(p, T)
             Qo, Qw, Qg = self._convert_production_rates(props)
+            Qg = self._calculate_gas_prod_rate_gas_lift(depth, p, T, Qg)
             v_sl, v_sg, v_m = self._calculate_superficial_velocities(Qo, Qw, Qg, A)
             self.v_sl_profile[i] = v_sl
             self.v_sg_profile[i] = v_sg
