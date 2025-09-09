@@ -54,10 +54,7 @@ class HagedornBrown(CorrelationBase):
                 # 3. Add to the total gas rate
                 Qg_total_acfd += injected_gas_acfd
 
-            # 4. Convert back to SCFD for the correlation
-            Qg_total_scfd = Qg_total_acfd / bg_injected
-
-            v_sl, v_sg, v_m = self._calculate_superficial_velocities(Qo, Qw, Qg_total_scfd, A)
+            v_sl, v_sg, v_m = self._calculate_superficial_velocities(Qo, Qw, Qg_total_acfd, A)
             self.v_sl_profile[i] = v_sl
             self.v_sg_profile[i] = v_sg
 
