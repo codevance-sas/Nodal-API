@@ -4,6 +4,7 @@ import math
 import numpy as np
 from abc import ABC, abstractmethod
 from typing import Optional, Tuple, Dict, Any, List
+from app.services.pvt.gas_props import calculate_z as calculate_z_factor, calculate_bg
 
 class CorrelationBase(ABC):
     """
@@ -60,6 +61,16 @@ class CorrelationBase(ABC):
         # Set initial conditions
         self.pressures[0] = self.surface_pressure
         self.temperatures = self.fluid.surface_temperature + self.fluid.temperature_gradient * self.depth_points
+
+                        # --- START GAS LIFT MODIFICATION ---
+        # Store gas lift configuration from the input data
+        self.gas_lift_config = data.gas_lift
+        self.gas_lift_enabled = self.gas_lift_config and self.gas_lift_config.enabled
+        if self.gas_lift_enabled:
+            self.gas_lift_depth = self.gas_lift_config.injection_depth
+            # Convert from MCFD (frontend input) to SCFD for internal calculations
+            self.gas_lift_volume_scfd = self.gas_lift_config.injection_volume_mcfd * 1000
+            self.injected_gas_gravity = self.gas_lift_config.injected_gas_gravity
 
     def _calculate_pipe_segment(self, depth: float):
         """
@@ -288,6 +299,32 @@ class CorrelationBase(ABC):
         else:
             # Laminar flow
             return 64.0 / Re
+
+    def _calculate_gas_prod_rate_gas_lift(self, Qg_reservoir: float) -> float:
+        # --- START GAS LIFT LOGIC ---
+            Qg_total_acfd = Qg_reservoir
+
+            if self.gas_lift_enabled and depth <= self.gas_lift_depth and self.gas_lift_volume_scfd > 0:
+                # 1. Convert injected gas from SCFD to ACFS (actual ft³/s)
+                # First, get Bg for the *injected gas* at current P, T
+                # Create a temporary PVTInput-like object for the injected gas
+                injected_gas_data = {
+                    "pressure": p,
+                    "temperature": T,
+                    "gas_gravity": self.injected_gas_gravity
+                }
+                
+                z_injected = calculate_z_factor(type('obj', (object,), injected_gas_data)())
+                bg_injected = calculate_bg(type('obj', (object,), injected_gas_data)(), z_injected) # bg is in ft³/scf
+
+                # 2. Convert standard volume to actual volume rate (SCFD already converted from MCFD)
+                injected_gas_acfd = self.gas_lift_volume_scfd * bg_injected # Actual ft³ per day
+
+                # 3. Add to the total gas rate
+                Qg_total_acfd += injected_gas_acfd
+                
+            return Qg_total_acfd
+
 
     @abstractmethod
     def calculate_pressure_profile(self):
